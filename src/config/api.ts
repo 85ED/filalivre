@@ -1,5 +1,6 @@
 // API Configuration
-export const API_URL = 'http://localhost:3001/api';
+const isProd = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
+export const API_URL = isProd ? 'https://filalivre-api.up.railway.app/api' : 'http://localhost:3001/api';
 
 // Default barbershop ID for now
 export const DEFAULT_BARBERSHOP_ID = 1;
