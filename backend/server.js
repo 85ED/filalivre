@@ -6,10 +6,10 @@ import authRoutes from './src/routes/auth.js';
 import queueRoutes from './src/routes/queue.js';
 import barberRoutes from './src/routes/barbers.js';
 import barbershopRoutes from './src/routes/barbershops.js';
-import whatsappRoutes from './src/routes/whatsapp.js';
-import { checkQueueAlerts } from './src/workers/QueueAlertWorker.js';
 import { runMigrations } from './src/seeds/migrate.js';
 import { seedPlatformOwner } from './src/seeds/platformOwner.js';
+
+const WHATSAPP_ENABLED = process.env.WHATSAPP_ENABLED === 'true';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -43,10 +43,20 @@ app.use('/api/auth', authRoutes);
 app.use('/api/queue', queueRoutes);
 app.use('/api/barbers', barberRoutes);
 app.use('/api/barbershops', barbershopRoutes);
-app.use('/api/whatsapp', whatsappRoutes);
 
-// Queue alert worker - verifica a cada 5s e envia WhatsApp
-setInterval(checkQueueAlerts, 5000);
+// WhatsApp routes and worker (requires Chrome/Puppeteer - disabled in minimal containers)
+if (WHATSAPP_ENABLED) {
+  const whatsappRoutes = (await import('./src/routes/whatsapp.js')).default;
+  const { checkQueueAlerts } = await import('./src/workers/QueueAlertWorker.js');
+  app.use('/api/whatsapp', whatsappRoutes);
+  setInterval(checkQueueAlerts, 5000);
+  console.log('[WhatsApp] Enabled');
+} else {
+  app.use('/api/whatsapp', (req, res) => {
+    res.status(503).json({ error: 'WhatsApp não está habilitado neste servidor' });
+  });
+  console.log('[WhatsApp] Disabled (set WHATSAPP_ENABLED=true to enable)');
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -70,7 +80,7 @@ async function bootstrap() {
 }
 
 // Start server
-const server = app.listen(PORT, async () => {
+const server = app.listen(PORT, '0.0.0.0', async () => {
   console.log(`
 ╔════════════════════════════════════════╗
 ║  FilaLivre Backend Server Started      ║

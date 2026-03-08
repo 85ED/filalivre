@@ -50,7 +50,7 @@ export async function apiRequest<T>(
     if (error instanceof ApiError) {
       throw error;
     }
-    throw new ApiError('Erro de conexão com o servidor. Verifique sua internet.', 0, error);
+    throw new ApiError('Nosso servidor está temporariamente indisponível. Tente novamente em alguns instantes.', 0, error);
   }
 }
 
