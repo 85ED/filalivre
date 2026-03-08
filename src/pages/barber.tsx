@@ -1,22 +1,45 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Play, CircleCheck, X, Clock, User, AlertCircle } from 'lucide-react';
-import { useState } from 'react';
-import { useQueue, useBarbers } from '@/hooks';
+import { Play, CircleCheck, X, Clock, User, AlertCircle, LogOut, BarChart3 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useQueue, useBarbers, useAuth } from '@/hooks';
 import { DEFAULT_BARBERSHOP_ID } from '@/config/api';
 import { Container } from '@/components/layout';
 import { queueService, barberService } from '@/services';
+import { reportsService } from '@/services/reportsService';
+import type { ReportsData, BarberClientData } from '@/services/reportsService';
+import { useNavigate } from 'react-router-dom';
+import { FilaLivreLogo } from '@/components/ui/filalivre-logo';
 
-// Barbeiro logado (em produção virá do auth/localStorage)
-const LOGGED_BARBER_ID = '1';
+function getBarbershopId(): number {
+  const stored = localStorage.getItem('barbershop_id');
+  return stored ? parseInt(stored) : DEFAULT_BARBERSHOP_ID;
+}
+
+function getLoggedBarberId(): string {
+  const stored = localStorage.getItem('barber_id');
+  return stored || '1';
+}
 
 export function BarberPage() {
   const [barberStatus, setBarberStatus] = useState<'available' | 'serving' | 'paused'>('available');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showStats, setShowStats] = useState(false);
+  const [statsData, setStatsData] = useState<{ today: ReportsData | null; month: ReportsData | null; clients: BarberClientData | null }>({ today: null, month: null, clients: null });
+  const [statsLoading, setStatsLoading] = useState(false);
+  const { user, logout, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
 
-  const { barbers } = useBarbers(DEFAULT_BARBERSHOP_ID, true, 5000);
-  const { queue, refetch: refetchQueue } = useQueue(DEFAULT_BARBERSHOP_ID, true, 5000);
+  const barbershopId = getBarbershopId();
+  const LOGGED_BARBER_ID = getLoggedBarberId();
+
+  useEffect(() => {
+    document.title = 'FilaLivre — Profissional';
+  }, []);
+
+  const { barbers } = useBarbers(barbershopId, true, 5000);
+  const { queue, refetch: refetchQueue } = useQueue(barbershopId, true, 5000);
 
   const currentBarber = barbers.find((b) => b.id === LOGGED_BARBER_ID);
 
@@ -38,11 +61,28 @@ export function BarberPage() {
     (q) => q.barberId === LOGGED_BARBER_ID && (q.status === 'serving' || q.status === 'called')
   );
 
+  const openStatsModal = async () => {
+    setShowStats(true);
+    setStatsLoading(true);
+    try {
+      const [today, month, clients] = await Promise.all([
+        reportsService.getReports(barbershopId, 'today'),
+        reportsService.getReports(barbershopId, 'month'),
+        reportsService.getBarberReport(barbershopId, parseInt(LOGGED_BARBER_ID), 'today'),
+      ]);
+      setStatsData({ today, month, clients });
+    } catch (err) {
+      console.error('Failed to fetch stats:', err);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
   const handleCallNext = async () => {
     setLoading(true);
     setError(null);
     try {
-      const next = await queueService.callNext(LOGGED_BARBER_ID, DEFAULT_BARBERSHOP_ID);
+      const next = await queueService.callNext(LOGGED_BARBER_ID, barbershopId);
       if (next) {
         setBarberStatus('serving');
       }
@@ -59,7 +99,7 @@ export function BarberPage() {
     setLoading(true);
     setError(null);
     try {
-      await queueService.finishClient(LOGGED_BARBER_ID, DEFAULT_BARBERSHOP_ID);
+      await queueService.finishClient(LOGGED_BARBER_ID, barbershopId);
       setBarberStatus('available');
       await refetchQueue();
     } catch (err) {
@@ -74,7 +114,7 @@ export function BarberPage() {
     setLoading(true);
     setError(null);
     try {
-      await queueService.skipClient(clientId, DEFAULT_BARBERSHOP_ID);
+      await queueService.skipClient(clientId, barbershopId);
       setBarberStatus('available');
       await refetchQueue();
     } catch (err) {
@@ -118,7 +158,7 @@ export function BarberPage() {
   };
 
   const serveTime = currentClient
-    ? Math.max(0, Math.floor((Date.now() - new Date(currentClient.createdAt).getTime()) / 1000))
+    ? Math.max(0, Math.floor((Date.now() - new Date(currentClient.serviceStartTime || currentClient.createdAt).getTime()) / 1000))
     : 0;
 
   return (
@@ -132,12 +172,23 @@ export function BarberPage() {
           className="space-y-1"
         >
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-black text-neutral-900">
-                {currentBarber?.name || 'Carregando...'}
-              </h1>
-              <p className="text-sm font-semibold text-neutral-500">Barbeiro &bull; Barbearia Gilmar</p>
+            <div className="flex items-center gap-3">
+              <FilaLivreLogo className="w-9 h-9" />
+              <div>
+                <h1 className="text-4xl font-black text-neutral-900">
+                  {currentBarber?.name || 'Carregando...'}
+                </h1>
+                <p className="text-sm font-semibold text-neutral-500">Profissional &bull; FilaLivre</p>
+              </div>
             </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={openStatsModal}
+              className="p-2 rounded-full border-2 border-neutral-200 text-neutral-500 hover:bg-neutral-100 transition-all"
+              title="Estatísticas"
+            >
+              <BarChart3 className="w-4 h-4" />
+            </button>
             <button
               onClick={handleToggleStatus}
               disabled={loading}
@@ -157,6 +208,14 @@ export function BarberPage() {
               <div className={`w-2.5 h-2.5 rounded-full ${getStatusDotColor()} ${barberStatus !== 'paused' && !currentClient ? 'animate-pulse' : ''}`} />
               {getStatusLabel()}
             </button>
+            <button
+              onClick={() => { logout(); navigate('/login'); }}
+              className="p-2 rounded-full border-2 border-neutral-200 text-neutral-500 hover:bg-neutral-100 transition-all"
+              title="Sair"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
           </div>
         </motion.div>
 
@@ -266,7 +325,7 @@ export function BarberPage() {
           className="bg-white rounded-2xl p-5 shadow-sm border border-neutral-200"
         >
           <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-500 mb-4">
-            Fila do {currentBarber?.name || 'barbeiro'} ({barberQueue.length})
+            Fila do {currentBarber?.name || 'profissional'} ({barberQueue.length})
           </h2>
           {barberQueue.length > 0 ? (
             <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -289,7 +348,7 @@ export function BarberPage() {
             </div>
           ) : (
             <div className="text-center py-6 text-neutral-500 bg-neutral-50 rounded-lg border border-neutral-200">
-              <p className="text-sm font-semibold">Nenhum cliente escolheu este barbeiro</p>
+              <p className="text-sm font-semibold">Nenhum cliente escolheu este profissional</p>
             </div>
           )}
         </motion.div>
@@ -335,6 +394,67 @@ export function BarberPage() {
         </motion.div>
 
       </Container>
+
+      {/* Stats Modal */}
+      {showStats && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl max-h-[80vh] overflow-y-auto"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-neutral-900">Estatísticas</h3>
+              <button onClick={() => setShowStats(false)} className="p-2 rounded-lg hover:bg-neutral-100">
+                <X className="w-5 h-5 text-neutral-500" />
+              </button>
+            </div>
+            {statsLoading ? (
+              <p className="text-center py-8 text-sm text-neutral-400">Carregando...</p>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-blue-50 rounded-xl p-4 text-center border border-blue-100">
+                    <p className="text-xs text-blue-600 font-semibold mb-1">Hoje</p>
+                    <p className="text-2xl font-black text-blue-700">{statsData.today?.totalFinished || 0}</p>
+                  </div>
+                  <div className="bg-purple-50 rounded-xl p-4 text-center border border-purple-100">
+                    <p className="text-xs text-purple-600 font-semibold mb-1">No mês</p>
+                    <p className="text-2xl font-black text-purple-700">{statsData.month?.totalFinished || 0}</p>
+                  </div>
+                  <div className="bg-emerald-50 rounded-xl p-4 text-center border border-emerald-100">
+                    <p className="text-xs text-emerald-600 font-semibold mb-1">Tempo médio</p>
+                    <p className="text-2xl font-black text-emerald-700">{statsData.today?.avgTime || 0}<span className="text-sm">min</span></p>
+                  </div>
+                </div>
+
+                {statsData.clients?.clients && statsData.clients.clients.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-bold text-neutral-700 mb-2">Clientes atendidos hoje</h4>
+                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                      {statsData.clients.clients.map((c) => (
+                        <div key={c.id} className="flex items-center justify-between p-2.5 rounded-lg bg-neutral-50 border border-neutral-100">
+                          <span className="text-sm text-neutral-800 font-medium">{c.name}</span>
+                          <span className="text-xs text-neutral-500">
+                            {new Date(c.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </motion.div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="mt-auto border-t border-neutral-100 py-6">
+        <p className="text-center text-xs text-neutral-400">
+          FilaLivre &copy; Sistema inteligente de fila de atendimento
+        </p>
+      </div>
     </div>
   );
 }

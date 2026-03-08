@@ -11,10 +11,14 @@ router.get('/slug/:slug', BarbershopController.getBySlug);
 router.get('/:id/status', BarbershopController.getStatus);
 router.get('/:id/reports', BarbershopController.getReports);
 router.get('/:id/reports/barber/:barberId', BarbershopController.getBarberReport);
+router.get('/:id/subscription', BarbershopController.getSubscription);
+
+// Platform owner routes
+router.get('/platform/stats', authMiddleware, roleMiddleware(['platform_owner']), BarbershopController.getPlatformStats);
 
 // Protected routes
-router.post('/', authMiddleware, roleMiddleware(['owner']), BarbershopController.create);
-router.patch('/:id', authMiddleware, roleMiddleware(['owner', 'admin']), BarbershopController.update);
-router.delete('/:id', authMiddleware, roleMiddleware(['owner']), BarbershopController.delete);
+router.post('/', authMiddleware, roleMiddleware(['platform_owner', 'owner']), BarbershopController.create);
+router.patch('/:id', authMiddleware, roleMiddleware(['platform_owner', 'owner', 'admin']), BarbershopController.update);
+router.delete('/:id', authMiddleware, roleMiddleware(['platform_owner', 'owner']), BarbershopController.delete);
 
 export default router;

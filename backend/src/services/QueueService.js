@@ -128,9 +128,27 @@ export class QueueService {
       throw createNotFoundError('Queue entry not found');
     }
 
-    // Skip by setting status to no_show
-    await Queue.updateStatus(queueId, 'no_show');
-    return true;
+    const newSkipCount = (client.skip_count || 0) + 1;
+
+    // If skipped 3 times, remove from queue
+    if (newSkipCount >= 3) {
+      await Queue.updateStatus(queueId, 'no_show');
+      // Free the barber if this client was being served
+      if (client.barber_id) {
+        await Barber.setCurrentClient(client.barber_id, null);
+        await Barber.updateStatus(client.barber_id, 'available');
+      }
+      return { removed: true, skipCount: newSkipCount };
+    }
+
+    // Move client behind the next person in queue
+    await Queue.skipAndReposition(queueId, barbershopId, newSkipCount);
+    // Free the barber if this client was being served
+    if (client.barber_id && (client.status === 'serving' || client.status === 'called')) {
+      await Barber.setCurrentClient(client.barber_id, null);
+      await Barber.updateStatus(client.barber_id, 'available');
+    }
+    return { removed: false, skipCount: newSkipCount };
   }
 
   static async getQueueMonitor(barbershopId) {

@@ -8,6 +8,9 @@ interface BackendBarber {
   id: number;
   barbershop_id: number;
   name: string;
+  photo_url: string | null;
+  role: string | null;
+  active: boolean;
   status: string;
   current_client_id: number | null;
   created_at: string;
@@ -26,7 +29,14 @@ interface BackendQueueItem {
   updated_at: string;
 }
 
+interface BarbershopInfo {
+  id: number;
+  name: string;
+  slug: string;
+}
+
 interface StatusResponse {
+  barbershop: BarbershopInfo | null;
   barbers: BackendBarber[];
   queue: BackendQueueItem[];
   stats: {
@@ -40,6 +50,9 @@ interface StatusResponse {
 const mapBarber = (b: BackendBarber): Barber => ({
   id: String(b.id),
   name: b.name,
+  photoUrl: b.photo_url || null,
+  role: b.role || null,
+  active: b.active !== undefined ? Boolean(b.active) : true,
   status: b.status as any,
   currentClientId: b.current_client_id ? String(b.current_client_id) : null,
   createdAt: b.created_at,
@@ -60,6 +73,7 @@ export function useBarbershopStatus(
   barbershopId: number = DEFAULT_BARBERSHOP_ID,
   refreshInterval = 10000
 ) {
+  const [barbershop, setBarbershop] = useState<BarbershopInfo | null>(null);
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [stats, setStats] = useState({ total: 0, waiting: 0, serving: 0, called: 0 });
@@ -76,6 +90,7 @@ export function useBarbershopStatus(
       if (!mountedRef.current) return;
 
       // Atualiza silenciosamente sem causar loading/flicker
+      setBarbershop(data.barbershop || null);
       setBarbers(data.barbers.map(mapBarber));
       setQueue(data.queue.map(mapQueueItem));
       setStats({
@@ -111,5 +126,5 @@ export function useBarbershopStatus(
     };
   }, [fetchStatus, refreshInterval]);
 
-  return { barbers, queue, stats, loading, error, refetch: fetchStatus };
+  return { barbershop, barbers, queue, stats, loading, error, refetch: fetchStatus };
 }

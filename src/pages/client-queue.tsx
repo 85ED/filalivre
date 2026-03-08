@@ -8,12 +8,24 @@ import { useState, useEffect } from 'react';
 import { useQueueWithToken, useBarbers } from '@/hooks';
 import { DEFAULT_BARBERSHOP_ID } from '@/config/api';
 import type { QueueItem } from '@/types';
+import { FilaLivreLogo } from '@/components/ui/filalivre-logo';
+
+function getBarbershopId(): number {
+  const stored = localStorage.getItem('barbershop_id');
+  return stored ? parseInt(stored) : DEFAULT_BARBERSHOP_ID;
+}
 
 export function ClientQueuePage() {
   const [step, setStep] = useState<'name' | 'queue'>('name');
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [currentQueueItem, setCurrentQueueItem] = useState<QueueItem | null>(null);
+
+  const barbershopId = getBarbershopId();
+
+  useEffect(() => {
+    document.title = 'FilaLivre — Entrar na Fila';
+  }, []);
 
   const { 
     queue, 
@@ -23,9 +35,9 @@ export function ClientQueuePage() {
     error: queueError,
     clientQueueItem,
     recover 
-  } = useQueueWithToken(DEFAULT_BARBERSHOP_ID, { autoRefresh: true, refreshInterval: 5000 });
+  } = useQueueWithToken(barbershopId, { autoRefresh: true, refreshInterval: 5000 });
   
-  const { barbers, loading: barbersLoading, error: barbersError } = useBarbers(DEFAULT_BARBERSHOP_ID, true, 5000);
+  const { barbers, loading: barbersLoading, error: barbersError } = useBarbers(barbershopId, true, 5000);
 
   // Tentar recuperar cliente do token ao montar
   useEffect(() => {
@@ -116,10 +128,10 @@ export function ClientQueuePage() {
             {/* Branding Header */}
             <div className="bg-gradient-to-r from-neutral-900 to-neutral-800 rounded-3xl p-8 text-white text-center space-y-4">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white mb-3">
-                <Scissors className="w-8 h-8 text-neutral-900" />
+                <FilaLivreLogo className="w-10 h-10" />
               </div>
               <div className="space-y-1">
-                <h1 className="text-4xl font-black">Barbearia Gilmar</h1>
+                <h1 className="text-4xl font-black">FilaLivre</h1>
                 <p className="text-neutral-300 text-lg">Sistema de Fila Digital</p>
               </div>
               <p className="text-neutral-400 text-sm">
@@ -416,8 +428,8 @@ export function ClientQueuePage() {
       {/* Footer */}
       <div className="bg-neutral-900 border-t border-neutral-800 py-6 mt-8">
         <div className="max-w-[420px] mx-auto px-4 text-center">
-          <p className="text-xs text-neutral-400">Fila App</p>
-          <p className="text-xs text-neutral-500 mt-1">© 2026 CODE85</p>
+          <p className="text-xs text-neutral-400">FilaLivre</p>
+          <p className="text-xs text-neutral-500 mt-1">&copy; Sistema inteligente de fila de atendimento</p>
         </div>
       </div>
 

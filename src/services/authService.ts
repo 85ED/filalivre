@@ -1,54 +1,35 @@
 import { api } from './api';
-import type { User, LoginCredentials, AuthResponse } from '@/types';
-
-const MOCK_USER: User = {
-  id: 'user-1',
-  email: 'admin@barbershop.com',
-  name: 'Admin User',
-  role: 'admin',
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-};
+import type { User, LoginCredentials, AuthResponse, SignupData, SignupResponse } from '@/types';
 
 export const authService = {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    try {
-      return await api.post<AuthResponse>('/auth/login', credentials);
-    } catch (error) {
-      console.warn('API not available, using mock data:', error);
-      return {
-        user: MOCK_USER,
-        token: 'mock-token-' + Math.random().toString(36).substr(2, 9),
-      };
-    }
+    const result = await api.post<AuthResponse>('/auth/login', credentials);
+    localStorage.setItem('auth_token', result.token);
+    return result;
   },
 
   async logout(): Promise<void> {
-    try {
-      await api.post('/auth/logout');
-    } catch (error) {
-      console.warn('API not available:', error);
-    }
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_data');
+    localStorage.removeItem('barbershop_id');
   },
 
-  async getCurrentUser(): Promise<User> {
-    try {
-      return await api.get<User>('/auth/me');
-    } catch (error) {
-      console.warn('API not available, using mock data:', error);
-      return MOCK_USER;
-    }
+  async getCurrentUser(): Promise<{ user: User }> {
+    return api.get<{ user: User }>('/auth/me');
   },
 
-  async refreshToken(): Promise<AuthResponse> {
-    try {
-      return await api.post<AuthResponse>('/auth/refresh');
-    } catch (error) {
-      console.warn('API not available, using mock data:', error);
-      return {
-        user: MOCK_USER,
-        token: 'mock-token-' + Math.random().toString(36).substr(2, 9),
-      };
-    }
+  async signup(data: SignupData): Promise<SignupResponse> {
+    const result = await api.post<SignupResponse>('/auth/signup', data);
+    localStorage.setItem('auth_token', result.token);
+    localStorage.setItem('barbershop_id', String(result.barbershop.id));
+    return result;
+  },
+
+  getStoredToken(): string | null {
+    return localStorage.getItem('auth_token');
+  },
+
+  isAuthenticated(): boolean {
+    return !!localStorage.getItem('auth_token');
   },
 };

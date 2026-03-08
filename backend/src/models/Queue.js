@@ -104,13 +104,20 @@ export class Queue {
   }
 
   static async updateStatus(id, status) {
-    const validStatuses = ['waiting', 'called', 'serving', 'finished', 'cancelled', 'no_show'];
+    const validStatuses = ['waiting', 'called', 'serving', 'finished', 'cancelled', 'no_show', 'removed'];
     if (!validStatuses.includes(status)) {
       throw new Error(`Status inválido: ${status}`);
     }
 
+    let extra = '';
+    if (status === 'serving') {
+      extra = ', service_start_time = NOW()';
+    } else if (status === 'finished') {
+      extra = ', finished_at = NOW()';
+    }
+
     const [result] = await pool.query(
-      'UPDATE queue SET status = ?, updated_at = NOW() WHERE id = ?',
+      `UPDATE queue SET status = ?, updated_at = NOW()${extra} WHERE id = ?`,
       [status, id]
     );
     return result.affectedRows > 0;
@@ -154,7 +161,7 @@ export class Queue {
       // Atualiza status para serving e atribui ao barbeiro
       await connection.query(
         `UPDATE queue 
-         SET status = 'serving', barber_id = ?, updated_at = NOW()
+         SET status = 'serving', barber_id = ?, service_start_time = NOW(), updated_at = NOW()
          WHERE id = ?`,
         [barberId, clientId]
       );
@@ -294,13 +301,67 @@ export class Queue {
 
   static async getAvgServiceTime(barbershopId, startDate, endDate) {
     const [rows] = await pool.query(
-      `SELECT AVG(TIMESTAMPDIFF(MINUTE, updated_at, finished_at)) as avg_time FROM queue
+      `SELECT AVG(TIMESTAMPDIFF(MINUTE, COALESCE(service_start_time, updated_at), finished_at)) as avg_time FROM queue
        WHERE barbershop_id = ? AND status = 'finished'
        AND finished_at IS NOT NULL
        AND created_at >= ? AND created_at < ?`,
       [barbershopId, startDate, endDate]
     );
     return Math.round(rows[0].avg_time || 0);
+  }
+
+  // Skip client: move behind next person in queue
+  static async skipAndReposition(queueId, barbershopId, newSkipCount) {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [current] = await connection.query(
+        'SELECT * FROM queue WHERE id = ? FOR UPDATE',
+        [queueId]
+      );
+      if (!current.length) {
+        await connection.commit();
+        return false;
+      }
+
+      const currentPos = current[0].position;
+
+      // Find next waiting person after this one
+      const [nextPerson] = await connection.query(
+        `SELECT id, position FROM queue 
+         WHERE barbershop_id = ? AND status = 'waiting' AND position > ?
+         ORDER BY position ASC LIMIT 1 FOR UPDATE`,
+        [barbershopId, currentPos]
+      );
+
+      if (nextPerson.length) {
+        // Swap positions
+        const nextPos = nextPerson[0].position;
+        await connection.query(
+          'UPDATE queue SET position = ?, status = \'waiting\', skip_count = ?, updated_at = NOW(), barber_id = NULL WHERE id = ?',
+          [nextPos, newSkipCount, queueId]
+        );
+        await connection.query(
+          'UPDATE queue SET position = ? WHERE id = ?',
+          [currentPos, nextPerson[0].id]
+        );
+      } else {
+        // No next person, just reset status to waiting
+        await connection.query(
+          'UPDATE queue SET status = \'waiting\', skip_count = ?, updated_at = NOW(), barber_id = NULL WHERE id = ?',
+          [newSkipCount, queueId]
+        );
+      }
+
+      await connection.commit();
+      return true;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 
   static async getCountByBarber(barbershopId, startDate, endDate) {

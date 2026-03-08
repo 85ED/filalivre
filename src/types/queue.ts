@@ -8,6 +8,7 @@ export interface QueueItem {
   barberId: string | null;
   createdAt: string;
   updatedAt: string;
+  serviceStartTime: string | null;
 }
 
 export interface CreateQueueItemDto {

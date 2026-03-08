@@ -70,6 +70,11 @@ export class BarbershopService {
     await Barbershop.update(id, {
       name: data.name,
       slug: data.slug ? data.slug.toLowerCase() : undefined,
+      owner_name: data.owner_name,
+      email: data.email,
+      phone: data.phone,
+      subscription_status: data.subscription_status,
+      trial_expires_at: data.trial_expires_at,
     });
 
     const updated = await Barbershop.findById(id);

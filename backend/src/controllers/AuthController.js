@@ -33,9 +33,36 @@ export class AuthController {
 
   static async me(req, res, next) {
     try {
+      // Fetch full user data from DB
+      const User = (await import('../models/User.js')).default;
+      const user = await User.findById(req.user.id);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
       res.json({
-        user: req.user,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          barbershopId: user.barbershop_id,
+        },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async signup(req, res, next) {
+    try {
+      const { establishmentName, name, email, password, phone } = req.body;
+
+      if (!establishmentName || !name || !email || !password) {
+        return res.status(400).json({ error: 'Todos os campos obrigatórios devem ser preenchidos' });
+      }
+
+      const result = await AuthService.signup(establishmentName, name, email, password, phone);
+      res.status(201).json(result);
     } catch (error) {
       next(error);
     }

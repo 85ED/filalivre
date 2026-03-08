@@ -1,0 +1,179 @@
+import pool from '../config/database.js';
+
+export async function runMigrations() {
+  try {
+    // Ensure migrations tracking table exists
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS _migrations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL UNIQUE,
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Define migrations to apply inline (safe, idempotent checks)
+    const migrations = [
+      {
+        name: '004_platform_owner_and_trial',
+        queries: [
+          // Check and add platform_owner to role enum
+          async (conn) => {
+            try {
+              await conn.query(`ALTER TABLE users MODIFY COLUMN role ENUM('platform_owner', 'owner', 'admin', 'barber') NOT NULL`);
+            } catch (e) { /* already modified */ }
+          },
+          // Allow NULL barbershop_id
+          async (conn) => {
+            try {
+              await conn.query(`ALTER TABLE users MODIFY COLUMN barbershop_id INT NULL`);
+            } catch (e) { /* already modified */ }
+          },
+          // Add skip_count
+          async (conn) => {
+            try {
+              const [cols] = await conn.query(`SHOW COLUMNS FROM queue LIKE 'skip_count'`);
+              if (cols.length === 0) {
+                await conn.query(`ALTER TABLE queue ADD COLUMN skip_count INT DEFAULT 0`);
+              }
+            } catch (e) { /* ignore */ }
+          },
+          // Add service_start_time
+          async (conn) => {
+            try {
+              const [cols] = await conn.query(`SHOW COLUMNS FROM queue LIKE 'service_start_time'`);
+              if (cols.length === 0) {
+                await conn.query(`ALTER TABLE queue ADD COLUMN service_start_time TIMESTAMP NULL`);
+              }
+            } catch (e) { /* ignore */ }
+          },
+          // Add finished_at
+          async (conn) => {
+            try {
+              const [cols] = await conn.query(`SHOW COLUMNS FROM queue LIKE 'finished_at'`);
+              if (cols.length === 0) {
+                await conn.query(`ALTER TABLE queue ADD COLUMN finished_at TIMESTAMP NULL`);
+              }
+            } catch (e) { /* ignore */ }
+          },
+          // Add updated_at
+          async (conn) => {
+            try {
+              const [cols] = await conn.query(`SHOW COLUMNS FROM queue LIKE 'updated_at'`);
+              if (cols.length === 0) {
+                await conn.query(`ALTER TABLE queue ADD COLUMN updated_at TIMESTAMP NULL`);
+              }
+            } catch (e) { /* ignore */ }
+          },
+          // Add trial_expires_at to barbershops
+          async (conn) => {
+            try {
+              const [cols] = await conn.query(`SHOW COLUMNS FROM barbershops LIKE 'trial_expires_at'`);
+              if (cols.length === 0) {
+                await conn.query(`ALTER TABLE barbershops ADD COLUMN trial_expires_at TIMESTAMP NULL`);
+              }
+            } catch (e) { /* ignore */ }
+          },
+          // Add current_client_id to barbers if missing
+          async (conn) => {
+            try {
+              const [cols] = await conn.query(`SHOW COLUMNS FROM barbers LIKE 'current_client_id'`);
+              if (cols.length === 0) {
+                await conn.query(`ALTER TABLE barbers ADD COLUMN current_client_id INT NULL`);
+              }
+            } catch (e) { /* ignore */ }
+          },
+        ],
+      },
+    ];
+
+    // Migration 005: subscription fields on barbershops
+    migrations.push({
+      name: '005_subscription_fields',
+      queries: [
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM barbershops LIKE 'subscription_status'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE barbershops ADD COLUMN subscription_status ENUM('trial','active','cancelled','expired') DEFAULT 'trial'`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM barbershops LIKE 'owner_name'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE barbershops ADD COLUMN owner_name VARCHAR(120) NULL`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM barbershops LIKE 'email'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE barbershops ADD COLUMN email VARCHAR(120) NULL`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM barbershops LIKE 'phone'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE barbershops ADD COLUMN phone VARCHAR(20) NULL`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+        // Backfill existing rows that have trial_expires_at but no subscription_status
+        async (conn) => {
+          try {
+            await conn.query(`UPDATE barbershops SET subscription_status = 'trial' WHERE trial_expires_at IS NOT NULL AND subscription_status IS NULL`);
+          } catch (e) { /* ignore */ }
+        },
+      ],
+    });
+
+    // Migration 006: barber photo_url, role, active
+    migrations.push({
+      name: '006_barber_photo_role_active',
+      queries: [
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM barbers LIKE 'photo_url'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE barbers ADD COLUMN photo_url VARCHAR(500) NULL AFTER name`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM barbers LIKE 'role'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE barbers ADD COLUMN role VARCHAR(60) NULL AFTER photo_url`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM barbers LIKE 'active'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE barbers ADD COLUMN active BOOLEAN DEFAULT TRUE AFTER role`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+      ],
+    });
+
+    for (const migration of migrations) {
+      const [applied] = await pool.query('SELECT * FROM _migrations WHERE name = ?', [migration.name]);
+      if (applied.length > 0) continue;
+
+      console.log(`[Migration] Applying: ${migration.name}`);
+      for (const queryFn of migration.queries) {
+        await queryFn(pool);
+      }
+      await pool.query('INSERT INTO _migrations (name) VALUES (?)', [migration.name]);
+      console.log(`[Migration] Applied: ${migration.name}`);
+    }
+  } catch (error) {
+    console.error('[Migration] Error:', error.message);
+  }
+}

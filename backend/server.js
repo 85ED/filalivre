@@ -1,6 +1,6 @@
+import './env.js';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { errorHandler, notFoundHandler } from './src/middlewares/auth.js';
 import authRoutes from './src/routes/auth.js';
 import queueRoutes from './src/routes/queue.js';
@@ -8,8 +8,8 @@ import barberRoutes from './src/routes/barbers.js';
 import barbershopRoutes from './src/routes/barbershops.js';
 import whatsappRoutes from './src/routes/whatsapp.js';
 import { checkQueueAlerts } from './src/workers/QueueAlertWorker.js';
-
-dotenv.config();
+import { runMigrations } from './src/seeds/migrate.js';
+import { seedPlatformOwner } from './src/seeds/platformOwner.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -49,16 +49,27 @@ app.use(notFoundHandler);
 // Error handler
 app.use(errorHandler);
 
+// Run migrations and seed on startup
+async function bootstrap() {
+  try {
+    await runMigrations();
+    await seedPlatformOwner();
+  } catch (err) {
+    console.error('[Bootstrap] Error:', err.message);
+  }
+}
+
 // Start server
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
   console.log(`
 ╔════════════════════════════════════════╗
-║  Fila Backend Server Started           ║
+║  FilaLivre Backend Server Started      ║
 ║  Port: ${PORT}                         
 ║  Environment: ${process.env.NODE_ENV || 'development'}
 ║  CORS Origin: ${process.env.CORS_ORIGIN || 'any'}
 ╚════════════════════════════════════════╝
   `);
+  await bootstrap();
 });
 
 // Graceful shutdown

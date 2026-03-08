@@ -3,13 +3,42 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BackgroundPaths } from '@/components/ui/background-paths';
-import { LogIn } from 'lucide-react';
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { LogIn, Loader2, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks';
+import { FilaLivreLogo } from '@/components/ui/filalivre-logo';
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const { login, getRedirectPath } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    document.title = 'FilaLivre — Login';
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setError('Preencha email e senha');
+      return;
+    }
+    setError(null);
+    setIsLoading(true);
+    try {
+      const user = await login({ email, password });
+      const path = getRedirectPath(user.role);
+      navigate(path);
+    } catch (err: any) {
+      setError(err?.data?.error || err?.message || 'Email ou senha inválidos');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white relative">
@@ -23,18 +52,23 @@ export function LoginPage() {
         >
           <div className="bg-white rounded-2xl shadow-2xl p-8 border border-neutral-100">
             <div className="text-center mb-8">
-              <div className="w-16 h-16 rounded-full bg-neutral-900 flex items-center justify-center mx-auto mb-4">
-                <LogIn className="w-8 h-8 text-white" />
-              </div>
+              <FilaLivreLogo className="w-16 h-16 mx-auto mb-4" />
               <h1 className="text-3xl font-bold text-neutral-900 mb-2">
-                Login
+                FilaLivre
               </h1>
               <p className="text-neutral-600">
                 Acesse sua conta
               </p>
             </div>
 
-            <form className="space-y-6">
+            {error && (
+              <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-neutral-900">
                   Email
@@ -65,9 +99,14 @@ export function LoginPage() {
 
               <Button
                 type="submit"
+                disabled={isLoading}
                 className="w-full h-12 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-base font-semibold"
               >
-                Entrar
+                {isLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  'Entrar'
+                )}
               </Button>
             </form>
 
@@ -79,6 +118,10 @@ export function LoginPage() {
           </div>
         </motion.div>
       </div>
+
+      <footer className="relative z-10 py-6 text-center">
+        <p className="text-sm text-neutral-400">FilaLivre &copy; Sistema inteligente de fila de atendimento</p>
+      </footer>
     </div>
   );
 }

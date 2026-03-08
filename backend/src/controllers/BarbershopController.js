@@ -1,8 +1,43 @@
 import BarbershopService from '../services/BarbershopService.js';
+import Barbershop from '../models/Barbershop.js';
 import Queue from '../models/Queue.js';
 import Barber from '../models/Barber.js';
 
 export class BarbershopController {
+  // Platform-owner-only stats
+  static async getPlatformStats(req, res, next) {
+    try {
+      const stats = await Barbershop.getPlatformStats();
+      res.json(stats);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Subscription status for a barbershop (used by frontend trial check)
+  static async getSubscription(req, res, next) {
+    try {
+      const barbershopId = parseInt(req.params.id);
+      const barbershop = await Barbershop.findById(barbershopId);
+      if (!barbershop) {
+        return res.status(404).json({ error: 'Barbershop not found' });
+      }
+      const trialExpired = barbershop.trial_expires_at && new Date(barbershop.trial_expires_at) <= new Date();
+      const isActive = barbershop.subscription_status === 'active';
+      const blocked = !isActive && trialExpired;
+      res.json({
+        subscriptionStatus: barbershop.subscription_status || 'trial',
+        trialExpiresAt: barbershop.trial_expires_at,
+        blocked,
+        daysRemaining: barbershop.trial_expires_at
+          ? Math.max(0, Math.ceil((new Date(barbershop.trial_expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+          : null,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async create(req, res, next) {
     try {
       const { name, slug } = req.body;
@@ -96,13 +131,14 @@ export class BarbershopController {
         return res.status(400).json({ error: 'Barbershop ID is required' });
       }
 
-      const [barbers, queueData, stats] = await Promise.all([
+      const [barbershop, barbers, queueData, stats] = await Promise.all([
+        Barbershop.findById(barbershopId),
         Barber.findByBarbershop(barbershopId),
         Queue.findByBarbershop(barbershopId),
         Queue.getQueueStats(barbershopId),
       ]);
 
-      res.json({ barbers, queue: queueData, stats });
+      res.json({ barbershop: barbershop ? { id: barbershop.id, name: barbershop.name, slug: barbershop.slug } : null, barbers, queue: queueData, stats });
     } catch (error) {
       next(error);
     }

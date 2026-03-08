@@ -3,13 +3,13 @@ import BarberService from '../services/BarberService.js';
 export class BarberController {
   static async create(req, res, next) {
     try {
-      const { barbershopId, name } = req.body;
+      const { barbershopId, name, photo_url, role, active } = req.body;
 
       if (!barbershopId || !name) {
         return res.status(400).json({ error: 'Barbershop ID and name are required' });
       }
 
-      const barber = await BarberService.createBarber(barbershopId, name);
+      const barber = await BarberService.createBarber(barbershopId, name, { photo_url, role, active });
       res.status(201).json(barber);
     } catch (error) {
       next(error);

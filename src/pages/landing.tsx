@@ -1,19 +1,173 @@
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { BackgroundPaths } from '@/components/ui/background-paths';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Smartphone, Eye, Bell, CircleCheck as CheckCircle, User, LogIn } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ArrowRight, Smartphone, Eye, Bell, CircleCheck as CheckCircle, User, LogIn, X, Loader2, AlertCircle } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { FilaLivreLogo } from '@/components/ui/filalivre-logo';
+import { useAuth } from '@/hooks';
 
 export function LandingPage() {
   const title = 'Fila Inteligente de Atendimento';
   const words = title.split(' ');
+  const [showSignup, setShowSignup] = useState(false);
+  const [signupData, setSignupData] = useState({
+    establishmentName: '',
+    name: '',
+    email: '',
+    password: '',
+    phone: '',
+  });
+  const [signupError, setSignupError] = useState<string | null>(null);
+  const [signupLoading, setSignupLoading] = useState(false);
+  const { signup } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    document.title = 'FilaLivre — Sistema de fila inteligente';
+  }, []);
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!signupData.establishmentName || !signupData.name || !signupData.email || !signupData.password) {
+      setSignupError('Preencha todos os campos obrigatórios');
+      return;
+    }
+    setSignupError(null);
+    setSignupLoading(true);
+    try {
+      await signup(signupData);
+      navigate('/admin');
+    } catch (err: any) {
+      setSignupError(err?.data?.error || err?.message || 'Erro ao criar conta');
+    } finally {
+      setSignupLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Signup Modal */}
+      <AnimatePresence>
+        {showSignup && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <FilaLivreLogo className="w-10 h-10" />
+                  <div>
+                    <h2 className="text-xl font-bold text-neutral-900">Experimentar grátis</h2>
+                    <p className="text-sm text-neutral-500">7 dias grátis, sem compromisso</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowSignup(false)} className="p-2 hover:bg-neutral-100 rounded-lg">
+                  <X className="w-5 h-5 text-neutral-500" />
+                </button>
+              </div>
+
+              {signupError && (
+                <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                  <p className="text-sm text-red-700">{signupError}</p>
+                </div>
+              )}
+
+              <form onSubmit={handleSignup} className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-neutral-900">Nome do estabelecimento *</Label>
+                  <Input
+                    placeholder="Ex: Barbearia do João"
+                    value={signupData.establishmentName}
+                    onChange={(e) => setSignupData({ ...signupData, establishmentName: e.target.value })}
+                    className="h-12 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-neutral-900">Seu nome *</Label>
+                  <Input
+                    placeholder="Seu nome completo"
+                    value={signupData.name}
+                    onChange={(e) => setSignupData({ ...signupData, name: e.target.value })}
+                    className="h-12 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-neutral-900">Email *</Label>
+                  <Input
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={signupData.email}
+                    onChange={(e) => setSignupData({ ...signupData, email: e.target.value })}
+                    className="h-12 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-neutral-900">Senha *</Label>
+                  <Input
+                    type="password"
+                    placeholder="Mínimo 6 caracteres"
+                    value={signupData.password}
+                    onChange={(e) => setSignupData({ ...signupData, password: e.target.value })}
+                    className="h-12 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-neutral-900">Telefone <span className="text-neutral-400 text-sm font-normal">(opcional)</span></Label>
+                  <Input
+                    type="tel"
+                    placeholder="(11) 99999-9999"
+                    value={signupData.phone}
+                    onChange={(e) => setSignupData({ ...signupData, phone: e.target.value })}
+                    className="h-12 rounded-xl"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  disabled={signupLoading}
+                  className="w-full h-12 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-base font-semibold"
+                >
+                  {signupLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    'Criar conta e começar'
+                  )}
+                </Button>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="relative overflow-hidden bg-white">
         <BackgroundPaths />
 
         <div className="relative z-10">
+          {/* Navbar */}
+          <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FilaLivreLogo className="w-10 h-10" />
+              <span className="text-xl font-bold text-neutral-900">FilaLivre</span>
+            </div>
+            <Link to="/login">
+              <Button variant="outline" size="sm" className="gap-2">
+                <LogIn className="w-4 h-4" />
+                Login
+              </Button>
+            </Link>
+          </div>
+
           <div className="max-w-7xl mx-auto px-4 py-20 sm:py-32">
             <motion.div
               initial={{ opacity: 0 }}
@@ -61,6 +215,7 @@ export function LandingPage() {
               >
                 <Button
                   size="lg"
+                  onClick={() => setShowSignup(true)}
                   className="group relative bg-neutral-900 hover:bg-neutral-800 text-white border-0 shadow-lg px-8 py-6 text-lg rounded-xl"
                 >
                   Experimentar grátis
@@ -223,8 +378,8 @@ export function LandingPage() {
 
       <footer className="py-8 bg-neutral-900 text-white">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-lg mb-2">Desenvolvido por <span className="font-bold">CODE85</span></p>
-          <p className="text-neutral-400">© 2026 CODE85</p>
+          <p className="text-lg mb-2">FilaLivre &copy;</p>
+          <p className="text-neutral-400">Sistema inteligente de fila de atendimento</p>
         </div>
       </footer>
     </div>

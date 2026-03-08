@@ -3,6 +3,9 @@ export type BarberStatus = 'available' | 'serving' | 'paused';
 export interface Barber {
   id: string;
   name: string;
+  photoUrl: string | null;
+  role: string | null;
+  active: boolean;
   status: BarberStatus;
   currentClientId: string | null;
   createdAt: string;
@@ -11,10 +14,16 @@ export interface Barber {
 
 export interface CreateBarberDto {
   name: string;
+  photo_url?: string | null;
+  role?: string | null;
+  active?: boolean;
 }
 
 export interface UpdateBarberDto {
   name?: string;
+  photo_url?: string | null;
+  role?: string | null;
+  active?: boolean;
   status?: BarberStatus;
   currentClientId?: string | null;
 }

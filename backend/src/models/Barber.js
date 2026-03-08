@@ -22,10 +22,10 @@ export class Barber {
     return rows;
   }
 
-  static async create(barbershopId, name) {
+  static async create(barbershopId, name, { photo_url, role, active } = {}) {
     const [result] = await pool.query(
-      'INSERT INTO barbers (barbershop_id, name, status) VALUES (?, ?, "available")',
-      [barbershopId, name]
+      'INSERT INTO barbers (barbershop_id, name, photo_url, role, active, status) VALUES (?, ?, ?, ?, ?, "available")',
+      [barbershopId, name, photo_url || null, role || null, active !== undefined ? active : true]
     );
     return result.insertId;
   }
@@ -47,7 +47,7 @@ export class Barber {
   }
 
   static async update(id, data) {
-    const { name, status, current_client_id } = data;
+    const { name, status, current_client_id, photo_url, role, active } = data;
     const fields = [];
     const values = [];
 
@@ -62,6 +62,18 @@ export class Barber {
     if (current_client_id !== undefined) {
       fields.push('current_client_id = ?');
       values.push(current_client_id);
+    }
+    if (photo_url !== undefined) {
+      fields.push('photo_url = ?');
+      values.push(photo_url);
+    }
+    if (role !== undefined) {
+      fields.push('role = ?');
+      values.push(role);
+    }
+    if (active !== undefined) {
+      fields.push('active = ?');
+      values.push(active);
     }
 
     if (fields.length === 0) return false;

@@ -2,14 +2,47 @@ import { motion } from 'framer-motion';
 import { Container } from '@/components/layout';
 import { useQueue } from '@/hooks';
 import { DEFAULT_BARBERSHOP_ID } from '@/config/api';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { CheckCircle, Clock, Volume2, MapPin } from 'lucide-react';
+import { reportsService } from '@/services/reportsService';
+import { FilaLivreLogo } from '@/components/ui/filalivre-logo';
+
+function getBarbershopId(): number {
+  const stored = localStorage.getItem('barbershop_id');
+  return stored ? parseInt(stored) : DEFAULT_BARBERSHOP_ID;
+}
 
 export function MonitorPage() {
-  const { queue, loading } = useQueue(DEFAULT_BARBERSHOP_ID, true, 2000);
+  const barbershopId = getBarbershopId();
+
+  useEffect(() => {
+    document.title = 'FilaLivre Monitor';
+  }, []);
+  const { queue, loading } = useQueue(barbershopId, true, 2000);
   const [time, setTime] = useState(new Date());
   const [prevServing, setPrevServing] = useState<string | null>(null);
   const [highlightNewClient, setHighlightNewClient] = useState(false);
+  const [avgTime, setAvgTime] = useState(0);
+  const [totalToday, setTotalToday] = useState(0);
+  const statsRef = useRef({ avgTime: 0, totalToday: 0 });
+
+  // Buscar stats reais do backend (avg time e total hoje)
+  const fetchMonitorStats = useCallback(async () => {
+    try {
+      const data = await reportsService.getReports(barbershopId, 'today');
+      statsRef.current = { avgTime: data.avgTime || 0, totalToday: data.totalFinished || 0 };
+      setAvgTime(data.avgTime || 0);
+      setTotalToday(data.totalFinished || 0);
+    } catch {
+      // ignore
+    }
+  }, [barbershopId]);
+
+  useEffect(() => {
+    fetchMonitorStats();
+    const interval = setInterval(fetchMonitorStats, 15000);
+    return () => clearInterval(interval);
+  }, [fetchMonitorStats]);
 
   // Atualizar relógio a cada segundo
   useEffect(() => {
@@ -44,7 +77,10 @@ export function MonitorPage() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center space-y-1"
         >
-          <h1 className="text-4xl font-black text-white drop-shadow-lg">Barbearia Gilmar</h1>
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <FilaLivreLogo className="h-10 w-10" variant="light" />
+            <h1 className="text-4xl font-black text-white drop-shadow-lg">FilaLivre</h1>
+          </div>
           <div className="flex items-center justify-center gap-3 text-neutral-300">
             <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
             <p className="text-base font-semibold">Sistema Online • Atualizado em Tempo Real</p>
@@ -199,14 +235,14 @@ export function MonitorPage() {
           <div className="bg-gradient-to-br from-neutral-700 to-neutral-800 rounded-xl p-4 border border-neutral-600 text-center shadow-lg hover:border-neutral-500 transition-colors">
             <p className="text-neutral-400 text-sm font-bold mb-2">TEMPO MÉD.</p>
             <p className="text-4xl font-black text-blue-400 drop-shadow-lg">
-              {totalWaiting > 0 ? (totalWaiting - 1) * 20 : 0}
+              {avgTime}
               <span className="text-xl">min</span>
             </p>
           </div>
           <div className="bg-gradient-to-br from-neutral-700 to-neutral-800 rounded-xl p-4 border border-neutral-600 text-center shadow-lg hover:border-neutral-500 transition-colors">
             <p className="text-neutral-400 text-sm font-bold mb-2">TOTAL HOJE</p>
             <p className="text-4xl font-black text-purple-400 drop-shadow-lg">
-              {queue.filter((q) => q.status !== 'finished').length}
+              {totalToday}
             </p>
           </div>
         </motion.div>
@@ -221,7 +257,7 @@ export function MonitorPage() {
             <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-neutral-700 border border-neutral-600 shadow-lg">
             <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
             <span className="text-neutral-200 font-bold text-sm">
-              Sistema online • Atualizado em tempo real
+              FilaLivre &copy; Sistema inteligente de fila de atendimento
             </span>
           </div>
         </motion.div>

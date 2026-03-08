@@ -3,3 +3,4 @@ export * from './useQueueWithToken';
 export * from './useBarbers';
 export * from './useAuth';
 export * from './useBarbershopStatus';
+export * from './useSubscription';

@@ -14,16 +14,31 @@ import {
   RefreshCw,
   Loader2,
   QrCode,
+  LogOut,
+  CreditCard,
+  Plus,
+  Pencil,
+  Trash2,
+  X,
+  Copy,
+  Check,
+  Link,
+  UserX,
 } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useBarbershopStatus } from '@/hooks';
+import { useNavigate } from 'react-router-dom';
+import { useBarbershopStatus, useAuth } from '@/hooks';
 import { reportsService } from '@/services/reportsService';
 import type { ReportsData, BarberClientData } from '@/services/reportsService';
 import { DEFAULT_BARBERSHOP_ID, API_ENDPOINTS } from '@/config/api';
 import { api } from '@/services/api';
+import { barberService } from '@/services/barberService';
+import { queueService } from '@/services/queueService';
+import type { Barber } from '@/types';
+import { FilaLivreLogo } from '@/components/ui/filalivre-logo';
 
 type Period = 'today' | 'week' | 'month';
-type View = 'overview' | 'byBarber' | 'barberDetail' | 'whatsapp';
+type View = 'overview' | 'byBarber' | 'barberDetail' | 'whatsapp' | 'professionals';
 
 const PERIOD_LABELS: Record<Period, string> = {
   today: 'Hoje',
@@ -31,8 +46,16 @@ const PERIOD_LABELS: Record<Period, string> = {
   month: 'Mês',
 };
 
+function getBarbershopId(): number {
+  const stored = localStorage.getItem('barbershop_id');
+  return stored ? parseInt(stored) : DEFAULT_BARBERSHOP_ID;
+}
+
 export function AdminPage() {
-  const { barbers, queue, stats, loading: statusLoading } = useBarbershopStatus(DEFAULT_BARBERSHOP_ID, 10000);
+  const barbershopId = getBarbershopId();
+  const { barbershop, barbers, queue, stats, loading: statusLoading, refetch: refetchStatus } = useBarbershopStatus(barbershopId, 10000);
+  const { user, logout, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
 
   const [period, setPeriod] = useState<Period>('today');
   const [view, setView] = useState<View>('overview');
@@ -47,10 +70,19 @@ export function AdminPage() {
   const [waLoading, setWaLoading] = useState(false);
   const waPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Professional CRUD state
+  const [showProModal, setShowProModal] = useState(false);
+  const [editingPro, setEditingPro] = useState<Barber | null>(null);
+  const [proForm, setProForm] = useState({ name: '', photo_url: '', role: '' });
+  const [proLoading, setProLoading] = useState(false);
+
+  // Slug copy state
+  const [copied, setCopied] = useState(false);
+
   const fetchReports = useCallback(async () => {
     setReportsLoading(true);
     try {
-      const data = await reportsService.getReports(DEFAULT_BARBERSHOP_ID, period);
+      const data = await reportsService.getReports(barbershopId, period);
       setReports(data);
     } catch (err) {
       console.error('Failed to fetch reports:', err);
@@ -63,11 +95,15 @@ export function AdminPage() {
     fetchReports();
   }, [fetchReports]);
 
+  useEffect(() => {
+    document.title = 'FilaLivre Admin';
+  }, []);
+
   // WhatsApp: fetch status on mount and when entering whatsapp view
   const fetchWaStatus = useCallback(async () => {
     try {
       const data = await api.get<{ active: boolean; status: string; qr: string | null }>(
-        API_ENDPOINTS.whatsappStatus(DEFAULT_BARBERSHOP_ID)
+        API_ENDPOINTS.whatsappStatus(barbershopId)
       );
       if (data.active) {
         setWaStatus('connected');
@@ -98,7 +134,7 @@ export function AdminPage() {
     setWaLoading(true);
     try {
       const data = await api.post<{ success: boolean; status: string; qr: string | null }>(
-        API_ENDPOINTS.whatsappConnect(DEFAULT_BARBERSHOP_ID)
+        API_ENDPOINTS.whatsappConnect(barbershopId)
       );
       setWaStatus(data.status as typeof waStatus);
       if (data.qr) setWaQr(data.qr);
@@ -112,7 +148,7 @@ export function AdminPage() {
   const handleWaDisconnect = async () => {
     setWaLoading(true);
     try {
-      await api.post(API_ENDPOINTS.whatsappDisconnect(DEFAULT_BARBERSHOP_ID));
+      await api.post(API_ENDPOINTS.whatsappDisconnect(barbershopId));
       setWaStatus('disconnected');
       setWaQr(null);
     } catch (err) {
@@ -122,11 +158,88 @@ export function AdminPage() {
     }
   };
 
+  // Professional CRUD handlers
+  const openCreatePro = () => {
+    setEditingPro(null);
+    setProForm({ name: '', photo_url: '', role: '' });
+    setShowProModal(true);
+  };
+
+  const openEditPro = (barber: Barber) => {
+    setEditingPro(barber);
+    setProForm({ name: barber.name, photo_url: barber.photoUrl || '', role: barber.role || '' });
+    setShowProModal(true);
+  };
+
+  const handleSavePro = async () => {
+    if (!proForm.name.trim()) return;
+    setProLoading(true);
+    try {
+      if (editingPro) {
+        await barberService.updateBarber(editingPro.id, {
+          name: proForm.name.trim(),
+          photo_url: proForm.photo_url.trim() || null,
+          role: proForm.role.trim() || null,
+        });
+      } else {
+        await barberService.createBarber(barbershopId, {
+          name: proForm.name.trim(),
+          photo_url: proForm.photo_url.trim() || null,
+          role: proForm.role.trim() || null,
+        });
+      }
+      setShowProModal(false);
+      refetchStatus();
+    } catch (err) {
+      console.error('Failed to save professional:', err);
+    } finally {
+      setProLoading(false);
+    }
+  };
+
+  const handleDeletePro = async (barberId: string) => {
+    if (!confirm('Remover este profissional?')) return;
+    try {
+      await barberService.deleteBarber(barberId);
+      refetchStatus();
+    } catch (err) {
+      console.error('Failed to delete professional:', err);
+    }
+  };
+
+  const handleToggleProActive = async (barber: Barber) => {
+    try {
+      await barberService.updateBarber(barber.id, { active: !barber.active });
+      refetchStatus();
+    } catch (err) {
+      console.error('Failed to toggle professional active:', err);
+    }
+  };
+
+  // Remove client from queue
+  const handleRemoveClient = async (clientId: string) => {
+    try {
+      await queueService.removeFromQueue(clientId, barbershopId);
+      refetchStatus();
+    } catch (err) {
+      console.error('Failed to remove client:', err);
+    }
+  };
+
+  // Copy slug link
+  const handleCopySlug = () => {
+    if (!barbershop?.slug) return;
+    const url = `${window.location.origin}/queue/${barbershop.slug}`;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const handleBarberClick = async (barberId: number, barberName: string) => {
     setSelectedBarber({ id: barberId, name: barberName });
     setView('barberDetail');
     try {
-      const data = await reportsService.getBarberReport(DEFAULT_BARBERSHOP_ID, barberId, period);
+      const data = await reportsService.getBarberReport(barbershopId, barberId, period);
       setBarberDetail(data);
     } catch (err) {
       console.error('Failed to fetch barber detail:', err);
@@ -143,6 +256,7 @@ export function AdminPage() {
     if (view === 'barberDetail') setView('byBarber');
     else if (view === 'byBarber') setView('overview');
     else if (view === 'whatsapp') setView('overview');
+    else if (view === 'professionals') setView('overview');
   };
 
   const totalWaiting = stats.waiting || 0;
@@ -186,23 +300,27 @@ export function AdminPage() {
         {/* HEADER */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {view !== 'overview' && (
+            {view !== 'overview' ? (
               <button onClick={goBack} className="p-2 rounded-xl hover:bg-neutral-200 transition-colors">
                 <ChevronLeft className="w-5 h-5 text-neutral-700" />
               </button>
+            ) : (
+              <FilaLivreLogo className="w-9 h-9" />
             )}
             <div>
               <h1 className="text-3xl font-bold text-neutral-900">
                 {view === 'overview' && 'Dashboard'}
-                {view === 'byBarber' && 'Atendimentos por Barbeiro'}
+                {view === 'byBarber' && 'Atendimentos por Profissional'}
                 {view === 'barberDetail' && selectedBarber?.name}
                 {view === 'whatsapp' && 'WhatsApp'}
+                {view === 'professionals' && 'Profissionais'}
               </h1>
               <p className="text-neutral-500 text-sm">
                 {view === 'overview' && 'Visão geral e relatórios'}
                 {view === 'byBarber' && `Período: ${PERIOD_LABELS[period]}`}
                 {view === 'barberDetail' && `Clientes atendidos — ${PERIOD_LABELS[period]}`}
                 {view === 'whatsapp' && 'Integração e configuração'}
+                {view === 'professionals' && 'Gerenciar profissionais do estabelecimento'}
               </p>
             </div>
           </div>
@@ -238,6 +356,22 @@ export function AdminPage() {
               </button>
             ))}
           </div>
+
+            <button
+              onClick={() => navigate('/assinatura')}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-purple-600 hover:bg-purple-50 border border-purple-200 shadow-sm transition-all"
+            >
+              <CreditCard className="w-4 h-4" />
+              Assinatura
+            </button>
+
+            <button
+              onClick={async () => { await logout(); navigate('/login'); }}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-neutral-600 hover:bg-neutral-100 border border-neutral-200 shadow-sm transition-all"
+            >
+              <LogOut className="w-4 h-4" />
+              Sair
+            </button>
           </div>
         </motion.div>
 
@@ -317,22 +451,34 @@ export function AdminPage() {
                 })}
               </div>
 
-              {/* Barbers */}
+              {/* Barbers → Profissionais */}
               <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-neutral-900">Barbeiros</h2>
-                  <span className="text-sm text-neutral-500">{barbers.length} cadastrados</span>
+                  <h2 className="text-lg font-semibold text-neutral-900">Profissionais</h2>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-neutral-500">{barbers.length} cadastrados</span>
+                    <button
+                      onClick={() => setView('professionals')}
+                      className="text-xs text-blue-600 hover:underline font-semibold"
+                    >
+                      Gerenciar
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   {barbers.map((barber) => (
                     <div
                       key={barber.id}
-                      className="flex items-center justify-between p-4 rounded-xl bg-neutral-50 border border-neutral-100"
+                      className={`flex items-center justify-between p-4 rounded-xl bg-neutral-50 border border-neutral-100 ${!barber.active ? 'opacity-50' : ''}`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-                          <Scissors className="w-5 h-5 text-white" />
-                        </div>
+                        {barber.photoUrl ? (
+                          <img src={barber.photoUrl} alt={barber.name} className="w-10 h-10 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                            <Scissors className="w-5 h-5 text-white" />
+                          </div>
+                        )}
                         <div>
                           <p className="font-semibold text-neutral-900">{barber.name}</p>
                           <div className="flex items-center gap-1.5">
@@ -340,6 +486,7 @@ export function AdminPage() {
                             <span className={`text-xs ${isBarberActive(barber.status) ? 'text-emerald-600' : 'text-neutral-500'}`}>
                               {getBarberStatusLabel(barber.status)}
                             </span>
+                            {barber.role && <span className="text-xs text-neutral-400 ml-1">• {barber.role}</span>}
                           </div>
                         </div>
                       </div>
@@ -353,6 +500,30 @@ export function AdminPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Slug / Link público */}
+              {barbershop?.slug && (
+                <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center">
+                        <Link className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-neutral-500">Link público da fila</p>
+                        <p className="font-semibold text-neutral-900">{window.location.origin}/queue/{barbershop.slug}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleCopySlug}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border border-neutral-200 hover:bg-neutral-50 transition-all"
+                    >
+                      {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-neutral-500" />}
+                      {copied ? 'Copiado!' : 'Copiar'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Queue + Chart */}
               <div className="grid md:grid-cols-2 gap-6">
@@ -371,11 +542,20 @@ export function AdminPage() {
                       queue.filter(q => q.status === 'waiting').slice(0, 8).map((client, index) => (
                         <div key={client.id} className="flex items-center justify-between p-3 rounded-lg bg-neutral-50 border border-neutral-100">
                           <span className="text-sm text-neutral-700">{index + 1}. {client.name}</span>
-                          <span className="text-xs text-neutral-500">
-                            {client.barberId
-                              ? barbers.find(b => b.id === client.barberId)?.name || 'Barbeiro'
-                              : 'Geral'}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-neutral-500">
+                              {client.barberId
+                                ? barbers.find(b => b.id === client.barberId)?.name || 'Profissional'
+                                : 'Geral'}
+                            </span>
+                            <button
+                              onClick={() => handleRemoveClient(client.id)}
+                              className="p-1 rounded-lg hover:bg-red-50 text-neutral-400 hover:text-red-500 transition-colors"
+                              title="Remover da fila"
+                            >
+                              <UserX className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       ))
                     ) : (
@@ -429,7 +609,7 @@ export function AdminPage() {
               className="space-y-4"
             >
               <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm">
-                <h2 className="text-lg font-semibold text-neutral-900 mb-4">Atendimentos por barbeiro</h2>
+                <h2 className="text-lg font-semibold text-neutral-900 mb-4">Atendimentos por profissional</h2>
                 {reports?.byBarber && reports.byBarber.length > 0 ? (
                   <div className="space-y-3">
                     {reports.byBarber.map((b) => {
@@ -644,8 +824,164 @@ export function AdminPage() {
               </div>
             </motion.div>
           )}
+
+          {view === 'professionals' && (
+            <motion.div
+              key="professionals"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-4"
+            >
+              <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-neutral-900">Todos os profissionais</h2>
+                  <button
+                    onClick={openCreatePro}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-neutral-900 text-white text-sm font-semibold hover:bg-neutral-800 transition-all"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Adicionar
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {barbers.map((barber) => (
+                    <div
+                      key={barber.id}
+                      className={`flex items-center justify-between p-4 rounded-xl border ${barber.active ? 'bg-neutral-50 border-neutral-100' : 'bg-neutral-100 border-neutral-200 opacity-60'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {barber.photoUrl ? (
+                          <img src={barber.photoUrl} alt={barber.name} className="w-12 h-12 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                            <Scissors className="w-6 h-6 text-white" />
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-semibold text-neutral-900">{barber.name}</p>
+                          <div className="flex items-center gap-2">
+                            {barber.role && <span className="text-xs text-neutral-500">{barber.role}</span>}
+                            <div className="flex items-center gap-1">
+                              <div className={`w-2 h-2 rounded-full ${isBarberActive(barber.status) ? 'bg-emerald-500' : 'bg-neutral-400'}`} />
+                              <span className={`text-xs ${isBarberActive(barber.status) ? 'text-emerald-600' : 'text-neutral-500'}`}>
+                                {getBarberStatusLabel(barber.status)}
+                              </span>
+                            </div>
+                            {!barber.active && <span className="text-xs text-red-500 font-semibold">Inativo</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleToggleProActive(barber)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                            barber.active
+                              ? 'border-red-200 text-red-600 hover:bg-red-50'
+                              : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
+                          }`}
+                        >
+                          {barber.active ? 'Desativar' : 'Ativar'}
+                        </button>
+                        <button
+                          onClick={() => openEditPro(barber)}
+                          className="p-2 rounded-lg hover:bg-neutral-100 text-neutral-500 transition-colors"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeletePro(barber.id)}
+                          className="p-2 rounded-lg hover:bg-red-50 text-neutral-400 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {barbers.length === 0 && (
+                    <p className="text-center py-8 text-sm text-neutral-400">Nenhum profissional cadastrado</p>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
         </AnimatePresence>
+
+        {/* Professional Modal */}
+        {showProModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-neutral-900">
+                  {editingPro ? 'Editar profissional' : 'Novo profissional'}
+                </h3>
+                <button onClick={() => setShowProModal(false)} className="p-2 rounded-lg hover:bg-neutral-100">
+                  <X className="w-5 h-5 text-neutral-500" />
+                </button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-neutral-700 mb-1">Nome *</label>
+                  <input
+                    type="text"
+                    value={proForm.name}
+                    onChange={(e) => setProForm(f => ({ ...f, name: e.target.value }))}
+                    className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-neutral-900 focus:border-transparent outline-none text-sm"
+                    placeholder="Nome do profissional"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-neutral-700 mb-1">URL da foto</label>
+                  <input
+                    type="url"
+                    value={proForm.photo_url}
+                    onChange={(e) => setProForm(f => ({ ...f, photo_url: e.target.value }))}
+                    className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-neutral-900 focus:border-transparent outline-none text-sm"
+                    placeholder="https://..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-neutral-700 mb-1">Função / Cargo</label>
+                  <input
+                    type="text"
+                    value={proForm.role}
+                    onChange={(e) => setProForm(f => ({ ...f, role: e.target.value }))}
+                    className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-neutral-900 focus:border-transparent outline-none text-sm"
+                    placeholder="Ex: Barbeiro, Cabeleireiro, Manicure..."
+                  />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => setShowProModal(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-neutral-200 text-sm font-semibold text-neutral-600 hover:bg-neutral-50 transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleSavePro}
+                    disabled={proLoading || !proForm.name.trim()}
+                    className="flex-1 py-2.5 rounded-xl bg-neutral-900 text-white text-sm font-semibold hover:bg-neutral-800 disabled:opacity-50 transition-all"
+                  >
+                    {proLoading ? 'Salvando...' : 'Salvar'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </div>
+
+      {/* Footer */}
+      <footer className="py-6 bg-neutral-900 text-white mt-8">
+        <div className="max-w-7xl mx-auto px-4 text-center">
+          <p className="text-sm mb-1">FilaLivre &copy;</p>
+          <p className="text-xs text-neutral-400">Sistema inteligente de fila de atendimento</p>
+        </div>
+      </footer>
     </div>
   );
 }

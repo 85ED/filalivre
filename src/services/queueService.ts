@@ -10,6 +10,7 @@ interface BackendQueueItem {
   status: 'waiting' | 'called' | 'serving' | 'finished' | 'removed';
   position: number;
   created_at: string;
+  service_start_time: string | null;
 }
 
 interface BackendQueueResponse {
@@ -31,6 +32,7 @@ const mapBackendQueueItem = (item: BackendQueueItem): QueueItem => ({
   barberId: item.barber_id ? String(item.barber_id) : null,
   createdAt: item.created_at,
   updatedAt: item.created_at,
+  serviceStartTime: item.service_start_time || null,
 });
 
 export const queueService = {
@@ -83,6 +85,7 @@ export const queueService = {
         barberId: response.barber_id ? String(response.barber_id) : null,
         createdAt: response.created_at || new Date().toISOString(),
         updatedAt: response.created_at || new Date().toISOString(),
+        serviceStartTime: response.service_start_time || null,
         token: response.token || response.queue_token,
       };
     } catch (error) {
@@ -104,6 +107,7 @@ export const queueService = {
         barberId: response.barber_id ? String(response.barber_id) : null,
         createdAt: response.created_at || new Date().toISOString(),
         updatedAt: response.created_at || new Date().toISOString(),
+        serviceStartTime: response.service_start_time || null,
         token: response.token || response.queue_token,
       };
     } catch (error) {
