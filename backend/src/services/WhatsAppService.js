@@ -1,0 +1,103 @@
+import wppconnect from '@wppconnect-team/wppconnect';
+import pool from '../config/database.js';
+
+const sessions = new Map();
+// Armazena último QR gerado por sessão (acessível pelo controller)
+const qrCodes = new Map();
+
+export async function startSession(sessionName) {
+  // Se já existe sessão ativa, retorna ela
+  if (sessions.has(sessionName)) {
+    return { client: sessions.get(sessionName), qr: null };
+  }
+
+  // Cria promise que resolve quando o QR é gerado ou a sessão conecta
+  let qrResolve;
+  const qrPromise = new Promise((resolve) => {
+    qrResolve = resolve;
+    // Timeout de 30s caso não gere QR (sessão já autenticada)
+    setTimeout(() => resolve(null), 30000);
+  });
+
+  const client = await wppconnect.create({
+    session: sessionName,
+    catchQR: (base64Qr) => {
+      console.log('[WhatsApp] QR Code gerado para sessão:', sessionName);
+      qrCodes.set(sessionName, base64Qr);
+      qrResolve(base64Qr);
+    },
+    statusFind: (statusSession) => {
+      console.log('[WhatsApp] Status da sessão:', statusSession);
+      if (statusSession === 'isLogged' || statusSession === 'qrReadSuccess') {
+        qrResolve(null); // Já conectado, não precisa de QR
+      }
+    },
+    headless: true,
+    useChrome: false,
+    logQR: true,
+  });
+
+  sessions.set(sessionName, client);
+
+  const qr = await qrPromise;
+  return { client, qr };
+}
+
+export function getSession(sessionName) {
+  return sessions.get(sessionName) || null;
+}
+
+export function getLastQR(sessionName) {
+  return qrCodes.get(sessionName) || null;
+}
+
+export async function sendMessage(sessionName, phone, message) {
+  const client = sessions.get(sessionName);
+
+  if (!client) {
+    throw new Error('Sessão WhatsApp não encontrada: ' + sessionName);
+  }
+
+  // Formata número: remove caracteres não-numéricos e adiciona @c.us
+  const cleanPhone = phone.replace(/\D/g, '');
+  const number = cleanPhone + '@c.us';
+
+  return client.sendText(number, message);
+}
+
+export function isSessionActive(sessionName) {
+  return sessions.has(sessionName);
+}
+
+export async function disconnectSession(sessionName) {
+  const client = sessions.get(sessionName);
+  if (client) {
+    try {
+      await client.close();
+    } catch (e) {
+      console.error('[WhatsApp] Erro ao fechar sessão:', e.message);
+    }
+    sessions.delete(sessionName);
+    qrCodes.delete(sessionName);
+  }
+}
+
+// Salva/atualiza sessão no banco de dados
+export async function registerSession(barbershopId, status = 'connected') {
+  const sessionName = 'barbershop_' + barbershopId;
+  await pool.query(
+    `INSERT INTO whatsapp_sessions (barbershop_id, session_name, status)
+     VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE status = ?, updated_at = NOW()`,
+    [barbershopId, sessionName, status, status]
+  );
+}
+
+// Busca status da sessão no banco
+export async function getSessionFromDB(barbershopId) {
+  const [rows] = await pool.query(
+    'SELECT * FROM whatsapp_sessions WHERE barbershop_id = ? ORDER BY id DESC LIMIT 1',
+    [barbershopId]
+  );
+  return rows[0] || null;
+}
