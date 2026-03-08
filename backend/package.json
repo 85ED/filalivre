@@ -7,6 +7,9 @@
   "scripts": {
     "dev": "node --watch server.js",
     "start": "node server.js",
+    "start:api": "node server.api.js",
+    "start:worker": "node server.worker.js",
+    "start:whatsapp": "node server.whatsapp.js",
     "seed": "node scripts/seed.js",
     "seed:reset": "node scripts/seed-reset.js",
     "test:api": "curl -X GET http://localhost:3001/health"

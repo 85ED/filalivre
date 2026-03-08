@@ -43,6 +43,32 @@ export async function startSession(sessionName) {
   return { client, qr };
 }
 
+export async function startAllSessions() {
+  try {
+    const [rows] = await pool.query(`
+      SELECT barbershop_id
+      FROM whatsapp_sessions
+      WHERE status = 'connected'
+    `);
+
+    console.log(`[WhatsApp] Iniciando ${rows.length} sessões do banco de dados...`);
+
+    for (const row of rows) {
+      const sessionName = "barbershop_" + row.barbershop_id;
+      try {
+        await startSession(sessionName);
+        console.log(`[WhatsApp] Sessão iniciada: ${sessionName}`);
+      } catch (err) {
+        console.error(`[WhatsApp] Erro ao iniciar sessão ${sessionName}:`, err.message);
+      }
+    }
+
+    console.log("[WhatsApp] Todas as sessões foram inicializadas");
+  } catch (err) {
+    console.error("[WhatsApp] Erro ao carregar sessões do banco:", err.message);
+  }
+}
+
 export function getSession(sessionName) {
   return sessions.get(sessionName) || null;
 }
