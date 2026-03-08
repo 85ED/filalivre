@@ -1,11 +1,30 @@
-import { Router } from 'express';
-import WhatsAppController from '../controllers/WhatsAppController.js';
+import express from 'express'
+import { sendMessage } from '../services/whatsapp/messageDispatcher.js'
+import { createSession } from '../services/whatsapp/sessionManager.js'
 
-const router = Router();
+const router = express.Router()
 
-router.post('/connect/:barbershopId', WhatsAppController.connect);
-router.post('/disconnect/:barbershopId', WhatsAppController.disconnect);
-router.get('/status/:barbershopId', WhatsAppController.status);
-router.get('/qr/:barbershopId', WhatsAppController.qr);
+router.post('/session/:barbeariaId', async (req, res) => {
+  const { barbeariaId } = req.params
 
-export default router;
+  try {
+    await createSession(barbeariaId)
+    res.json({ status: 'sessao iniciada' })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.post('/send', async (req, res) => {
+  const { barbeariaId, telefone, mensagem } = req.body
+
+  try {
+    await sendMessage(barbeariaId, telefone, mensagem)
+    res.json({ status: 'mensagem enviada' })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+export default router
+
