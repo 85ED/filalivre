@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { queueService } from '@/services';
 import { tokenService } from '@/services/tokenService';
-import { DEFAULT_BARBERSHOP_ID } from '@/config/api';
 import type { QueueItem, CreateQueueItemDto } from '@/types';
 
 interface UseQueueWithTokenOptions {
@@ -14,7 +13,7 @@ interface UseQueueWithTokenOptions {
  * Permite que clientes recuperem sua posição após refresh de página
  */
 export function useQueueWithToken(
-  barbershopId: number = DEFAULT_BARBERSHOP_ID,
+  barbershopId: number,
   options: UseQueueWithTokenOptions = {}
 ) {
   const { autoRefresh = false, refreshInterval = 10000 } = options;

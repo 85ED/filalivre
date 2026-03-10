@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { queueService } from '@/services';
-import { DEFAULT_BARBERSHOP_ID } from '@/config/api';
 import type { QueueItem, CreateQueueItemDto } from '@/types';
 
-export function useQueue(barbershopId: number = DEFAULT_BARBERSHOP_ID, autoRefresh = false, refreshInterval = 10000) {
+export function useQueue(barbershopId: number, autoRefresh = false, refreshInterval = 10000) {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);

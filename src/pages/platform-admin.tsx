@@ -52,6 +52,25 @@ const emptyForm = {
   trial_expires_at: '',
 };
 
+interface Plan {
+  id: number;
+  name: string;
+  price_cents: number;
+  interval: 'monthly' | 'yearly';
+  features: string[] | null;
+  stripe_price_id: string | null;
+  active: boolean;
+}
+
+const emptyPlanForm = {
+  name: '',
+  price: '',
+  interval: 'monthly' as 'monthly' | 'yearly',
+  features: '',
+  stripe_price_id: '',
+  active: true,
+};
+
 export function PlatformAdminPage() {
   const { user, logout, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -65,11 +84,14 @@ export function PlatformAdminPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (!authLoading && (!user || user.role !== 'platform_owner')) {
-      navigate('/login');
-    }
-  }, [user, authLoading, navigate]);
+  // Plans state
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [showPlanForm, setShowPlanForm] = useState(false);
+  const [editingPlanId, setEditingPlanId] = useState<number | null>(null);
+  const [planForm, setPlanForm] = useState(emptyPlanForm);
+  const [planSaving, setPlanSaving] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
+  const [deletingPlan, setDeletingPlan] = useState<number | null>(null);
 
   useEffect(() => {
     document.title = 'FilaLivre — Painel da Plataforma';
@@ -77,12 +99,14 @@ export function PlatformAdminPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [shopData, statsData] = await Promise.all([
+      const [shopData, statsData, plansData] = await Promise.all([
         api.get<{ barbershops: Barbershop[] }>('/barbershops'),
         api.get<PlatformStats>('/barbershops/platform/stats'),
+        api.get<{ plans: Plan[] }>('/plans/all'),
       ]);
       setBarbershops(shopData.barbershops);
       setStats(statsData);
+      setPlans(plansData.plans);
     } catch (err) {
       console.error('Failed to fetch data:', err);
     } finally {
@@ -166,6 +190,71 @@ export function PlatformAdminPage() {
       console.error('Failed to delete:', err);
     } finally {
       setDeleting(null);
+    }
+  };
+
+  // Plan CRUD
+  const openCreatePlan = () => {
+    setEditingPlanId(null);
+    setPlanForm(emptyPlanForm);
+    setPlanError(null);
+    setShowPlanForm(true);
+  };
+
+  const openEditPlan = (plan: Plan) => {
+    setEditingPlanId(plan.id);
+    setPlanForm({
+      name: plan.name,
+      price: (plan.price_cents / 100).toFixed(2),
+      interval: plan.interval,
+      features: plan.features ? plan.features.join('\n') : '',
+      stripe_price_id: plan.stripe_price_id || '',
+      active: plan.active,
+    });
+    setPlanError(null);
+    setShowPlanForm(true);
+  };
+
+  const handleSavePlan = async () => {
+    if (!planForm.name || !planForm.price) {
+      setPlanError('Nome e preço são obrigatórios');
+      return;
+    }
+    setPlanSaving(true);
+    setPlanError(null);
+    try {
+      const payload = {
+        name: planForm.name,
+        price_cents: Math.round(parseFloat(planForm.price) * 100),
+        interval: planForm.interval,
+        features: planForm.features.trim() ? planForm.features.split('\n').map(f => f.trim()).filter(Boolean) : [],
+        stripe_price_id: planForm.stripe_price_id || undefined,
+        active: planForm.active,
+      };
+      if (editingPlanId) {
+        await api.patch(`/plans/${editingPlanId}`, payload);
+      } else {
+        await api.post('/plans', payload);
+      }
+      setShowPlanForm(false);
+      await fetchData();
+    } catch (err: any) {
+      setPlanError(err?.message || 'Erro ao salvar plano');
+    } finally {
+      setPlanSaving(false);
+    }
+  };
+
+  const handleDeletePlan = async (id: number) => {
+    if (!confirm('Excluir este plano?')) return;
+    setDeletingPlan(id);
+    try {
+      await api.delete(`/plans/${id}`);
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to delete plan:', err);
+    } finally {
+      setDeletingPlan(null);
     }
   };
 
@@ -311,9 +400,75 @@ export function PlatformAdminPage() {
             </div>
           )}
         </div>
+
+        {/* Subscription Plans */}
+        <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-lg font-semibold text-neutral-900">Planos de Assinatura</h2>
+            <Button onClick={openCreatePlan} size="sm" className="gap-2 bg-neutral-900 hover:bg-neutral-800">
+              <Plus className="w-4 h-4" /> Novo plano
+            </Button>
+          </div>
+
+          {plans.length === 0 ? (
+            <p className="text-center py-8 text-sm text-neutral-400">
+              Nenhum plano cadastrado. Crie um plano para que os estabelecimentos possam assinar.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {plans.map((plan) => (
+                <div
+                  key={plan.id}
+                  className={`rounded-xl border p-5 space-y-3 ${plan.active ? 'border-neutral-200' : 'border-neutral-100 opacity-60'}`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="font-bold text-neutral-900">{plan.name}</h3>
+                      <p className="text-2xl font-bold text-neutral-900 mt-1">
+                        R$ {(plan.price_cents / 100).toFixed(2)}
+                        <span className="text-sm font-normal text-neutral-500">/{plan.interval === 'monthly' ? 'mês' : 'ano'}</span>
+                      </p>
+                    </div>
+                    {!plan.active && (
+                      <span className="text-xs font-semibold text-neutral-500 bg-neutral-100 px-2 py-1 rounded-full">Inativo</span>
+                    )}
+                  </div>
+                  {plan.features && plan.features.length > 0 && (
+                    <ul className="text-sm text-neutral-600 space-y-1">
+                      {plan.features.map((f, i) => (
+                        <li key={i} className="flex items-center gap-1.5">
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {plan.stripe_price_id && (
+                    <p className="text-xs text-neutral-400 font-mono truncate">Stripe: {plan.stripe_price_id}</p>
+                  )}
+                  <div className="flex items-center gap-1 pt-1">
+                    <button
+                      onClick={() => openEditPlan(plan)}
+                      className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500 hover:text-neutral-700"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeletePlan(plan.id)}
+                      disabled={deletingPlan === plan.id}
+                      className="p-1.5 rounded-lg hover:bg-red-50 text-neutral-400 hover:text-red-600"
+                    >
+                      {deletingPlan === plan.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* CREATE / EDIT MODAL */}
+      {/* CREATE / EDIT BARBERSHOP MODAL */}
       <AnimatePresence>
         {showForm && (
           <motion.div
@@ -429,6 +584,114 @@ export function PlatformAdminPage() {
                 <Button onClick={handleSave} disabled={saving} className="gap-2 bg-neutral-900 hover:bg-neutral-800">
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
                   {editingId ? 'Salvar' : 'Criar'}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* CREATE / EDIT PLAN MODAL */}
+      <AnimatePresence>
+        {showPlanForm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowPlanForm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-lg font-bold text-neutral-900">
+                  {editingPlanId ? 'Editar plano' : 'Novo plano'}
+                </h3>
+                <button onClick={() => setShowPlanForm(false)} className="p-1 rounded-lg hover:bg-neutral-100">
+                  <X className="w-5 h-5 text-neutral-500" />
+                </button>
+              </div>
+
+              {planError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3 mb-4">
+                  {planError}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <Label>Nome do plano *</Label>
+                  <Input
+                    value={planForm.name}
+                    onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })}
+                    placeholder="Pro"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Preço (R$) *</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={planForm.price}
+                      onChange={(e) => setPlanForm({ ...planForm, price: e.target.value })}
+                      placeholder="49.90"
+                    />
+                  </div>
+                  <div>
+                    <Label>Intervalo</Label>
+                    <select
+                      value={planForm.interval}
+                      onChange={(e) => setPlanForm({ ...planForm, interval: e.target.value as 'monthly' | 'yearly' })}
+                      className="w-full h-10 rounded-md border border-neutral-200 px-3 text-sm"
+                    >
+                      <option value="monthly">Mensal</option>
+                      <option value="yearly">Anual</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <Label>Recursos (um por linha)</Label>
+                  <textarea
+                    value={planForm.features}
+                    onChange={(e) => setPlanForm({ ...planForm, features: e.target.value })}
+                    placeholder="Fila digital ilimitada&#10;Painel administrativo&#10;Relatórios e KPIs"
+                    rows={4}
+                    className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm resize-none"
+                  />
+                </div>
+                <div>
+                  <Label>Stripe Price ID (opcional)</Label>
+                  <Input
+                    value={planForm.stripe_price_id}
+                    onChange={(e) => setPlanForm({ ...planForm, stripe_price_id: e.target.value })}
+                    placeholder="price_1234..."
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={planForm.active}
+                    onChange={(e) => setPlanForm({ ...planForm, active: e.target.checked })}
+                    className="rounded"
+                  />
+                  Plano ativo (visível para clientes)
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-6">
+                <Button variant="outline" onClick={() => setShowPlanForm(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleSavePlan} disabled={planSaving} className="gap-2 bg-neutral-900 hover:bg-neutral-800">
+                  {planSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                  {editingPlanId ? 'Salvar' : 'Criar'}
                 </Button>
               </div>
             </motion.div>

@@ -6,6 +6,7 @@ export interface User {
   name: string;
   role: UserRole;
   barbershopId?: number | null;
+  barberId?: number | null;
   createdAt: string;
   updatedAt: string;
 }

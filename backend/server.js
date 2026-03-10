@@ -1,11 +1,14 @@
 import './env.js';
 import express from 'express';
 import cors from 'cors';
-import { errorHandler, notFoundHandler } from './src/middlewares/auth.js';
+import { errorHandler, notFoundHandler, authMiddleware, roleMiddleware } from './src/middlewares/auth.js';
 import authRoutes from './src/routes/auth.js';
 import queueRoutes from './src/routes/queue.js';
 import barberRoutes from './src/routes/barbers.js';
 import barbershopRoutes from './src/routes/barbershops.js';
+import planRoutes from './src/routes/plans.js';
+import SubscriptionController from './src/controllers/SubscriptionController.js';
+import StripeWebhookController from './src/controllers/StripeWebhookController.js';
 import { runMigrations } from './src/seeds/migrate.js';
 import { seedPlatformOwner } from './src/seeds/platformOwner.js';
 
@@ -29,6 +32,10 @@ app.use(cors({
   },
   credentials: true,
 }));
+
+// Stripe webhook needs raw body — must be before express.json()
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), StripeWebhookController.handle);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -43,6 +50,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/queue', queueRoutes);
 app.use('/api/barbers', barberRoutes);
 app.use('/api/barbershops', barbershopRoutes);
+app.use('/api/plans', planRoutes);
+
+// Subscription (Stripe)
+app.post('/api/subscription/checkout', authMiddleware, roleMiddleware(['admin', 'owner']), SubscriptionController.createCheckout);
+app.post('/api/subscription/portal', authMiddleware, roleMiddleware(['admin', 'owner']), SubscriptionController.getPortalSession);
 
 // WhatsApp routes and worker (requires Chrome/Puppeteer - disabled in minimal containers)
 if (WHATSAPP_ENABLED) {

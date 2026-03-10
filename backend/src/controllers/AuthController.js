@@ -35,19 +35,28 @@ export class AuthController {
     try {
       // Fetch full user data from DB
       const User = (await import('../models/User.js')).default;
+      const Barber = (await import('../models/Barber.js')).default;
       const user = await User.findById(req.user.id);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
-      res.json({
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          barbershopId: user.barbershop_id,
-        },
-      });
+      const userData = {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        barbershopId: user.barbershop_id,
+      };
+
+      // Se é barbeiro, incluir barber_id
+      if (user.role === 'barber') {
+        const barber = await Barber.findByUserId(user.id);
+        if (barber) {
+          userData.barberId = barber.id;
+        }
+      }
+
+      res.json({ user: userData });
     } catch (error) {
       next(error);
     }

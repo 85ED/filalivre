@@ -2,12 +2,12 @@ import Barber from '../models/Barber.js';
 import { createValidationError, createNotFoundError } from '../middlewares/validators.js';
 
 export class BarberService {
-  static async createBarber(barbershopId, name, { photo_url, role, active } = {}) {
+  static async createBarber(barbershopId, name, { photo_url, role, active, user_id } = {}) {
     if (!name || name.trim() === '') {
       throw createValidationError('Barber name is required');
     }
 
-    const barberId = await Barber.create(barbershopId, name.trim(), { photo_url, role, active });
+    const barberId = await Barber.create(barbershopId, name.trim(), { photo_url, role, active, user_id });
     const barber = await Barber.findById(barberId);
 
     return barber;

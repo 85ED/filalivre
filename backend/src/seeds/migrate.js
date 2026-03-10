@@ -162,6 +162,70 @@ export async function runMigrations() {
       ],
     });
 
+    // Migration 007: user_id on barbers
+    migrations.push({
+      name: '007_add_user_id_to_barbers',
+      queries: [
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM barbers LIKE 'user_id'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE barbers ADD COLUMN user_id INT NULL`);
+              await conn.query(`ALTER TABLE barbers ADD INDEX idx_barbers_user_id (user_id)`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+      ],
+    });
+
+    // Migration 008: subscription_plans table + stripe columns on barbershops
+    migrations.push({
+      name: '008_subscription_plans',
+      queries: [
+        async (conn) => {
+          try {
+            await conn.query(`
+              CREATE TABLE IF NOT EXISTS subscription_plans (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(120) NOT NULL,
+                price_cents INT NOT NULL,
+                \`interval\` ENUM('monthly', 'yearly') NOT NULL DEFAULT 'monthly',
+                features JSON NULL,
+                stripe_price_id VARCHAR(100) NULL,
+                active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+              )
+            `);
+          } catch (e) { /* ignore */ }
+        },
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM barbershops LIKE 'stripe_customer_id'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE barbershops ADD COLUMN stripe_customer_id VARCHAR(100) NULL`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM barbershops LIKE 'stripe_subscription_id'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE barbershops ADD COLUMN stripe_subscription_id VARCHAR(100) NULL`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM barbershops LIKE 'plan_id'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE barbershops ADD COLUMN plan_id INT NULL`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+      ],
+    });
+
     for (const migration of migrations) {
       const [applied] = await pool.query('SELECT * FROM _migrations WHERE name = ?', [migration.name]);
       if (applied.length > 0) continue;

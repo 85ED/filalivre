@@ -1,5 +1,5 @@
 import { api } from './api';
-import { API_ENDPOINTS, DEFAULT_BARBERSHOP_ID } from '@/config/api';
+import { API_ENDPOINTS } from '@/config/api';
 
 export interface ReportsData {
   period: string;
@@ -31,7 +31,7 @@ export interface BarberClientData {
 }
 
 export const reportsService = {
-  async getReports(barbershopId: number = DEFAULT_BARBERSHOP_ID, period: 'today' | 'week' | 'month' = 'today'): Promise<ReportsData> {
+  async getReports(barbershopId: number, period: 'today' | 'week' | 'month' = 'today'): Promise<ReportsData> {
     return api.get<ReportsData>(`${API_ENDPOINTS.reports(barbershopId)}?period=${period}`);
   },
 

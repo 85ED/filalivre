@@ -12,6 +12,7 @@ export const authService = {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user_data');
     localStorage.removeItem('barbershop_id');
+    localStorage.removeItem('barber_id');
   },
 
   async getCurrentUser(): Promise<{ user: User }> {

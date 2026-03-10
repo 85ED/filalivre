@@ -14,6 +14,9 @@ export function useAuth() {
       authService.getCurrentUser()
         .then((response) => {
           setUser(response.user);
+          if (response.user.barberId) {
+            localStorage.setItem('barber_id', String(response.user.barberId));
+          }
         })
         .catch(() => {
           localStorage.removeItem('auth_token');
@@ -34,6 +37,9 @@ export function useAuth() {
       localStorage.setItem('auth_token', response.token);
       if (response.user.barbershopId) {
         localStorage.setItem('barbershop_id', String(response.user.barbershopId));
+      }
+      if (response.user.barberId) {
+        localStorage.setItem('barber_id', String(response.user.barberId));
       }
       return response.user;
     } catch (err) {
@@ -83,7 +89,7 @@ export function useAuth() {
       case 'platform_owner': return '/platform-admin';
       case 'admin':
       case 'owner': return '/admin';
-      case 'barber': return '/barber-dashboard';
+      case 'barber': return '/barbeiro';
       default: return '/';
     }
   }, []);

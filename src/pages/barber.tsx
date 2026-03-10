@@ -1,9 +1,8 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Play, CircleCheck, X, Clock, User, AlertCircle, LogOut, BarChart3 } from 'lucide-react';
+import { Play, CircleCheck, X, Clock, User, AlertCircle, LogOut, BarChart3, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useQueue, useBarbers, useAuth } from '@/hooks';
-import { DEFAULT_BARBERSHOP_ID } from '@/config/api';
 import { Container } from '@/components/layout';
 import { queueService, barberService } from '@/services';
 import { reportsService } from '@/services/reportsService';
@@ -13,12 +12,11 @@ import { FilaLivreLogo } from '@/components/ui/filalivre-logo';
 
 function getBarbershopId(): number {
   const stored = localStorage.getItem('barbershop_id');
-  return stored ? parseInt(stored) : DEFAULT_BARBERSHOP_ID;
+  return stored ? parseInt(stored) : 0;
 }
 
-function getLoggedBarberId(): string {
-  const stored = localStorage.getItem('barber_id');
-  return stored || '1';
+function getLoggedBarberId(): string | null {
+  return localStorage.getItem('barber_id');
 }
 
 export function BarberPage() {
@@ -38,8 +36,29 @@ export function BarberPage() {
     document.title = 'FilaLivre — Profissional';
   }, []);
 
-  const { barbers } = useBarbers(barbershopId, true, 5000);
-  const { queue, refetch: refetchQueue } = useQueue(barbershopId, true, 5000);
+  const { barbers } = useBarbers(barbershopId || 1, !!barbershopId, 5000);
+  const { queue, refetch: refetchQueue } = useQueue(barbershopId || 1, !!barbershopId, 5000);
+
+  // Se não há barber_id vinculado, mostrar mensagem
+  if (!authLoading && !LOGGED_BARBER_ID) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center space-y-4 max-w-sm px-4">
+          <AlertCircle className="w-12 h-12 text-orange-400 mx-auto" />
+          <h1 className="text-2xl font-bold text-neutral-900">Conta não vinculada</h1>
+          <p className="text-neutral-600">
+            Sua conta de usuário ainda não está vinculada a um profissional. Peça ao administrador do estabelecimento para vincular seu login.
+          </p>
+          <button
+            onClick={() => { logout(); navigate('/login'); }}
+            className="px-6 py-2 rounded-xl bg-neutral-900 text-white font-semibold"
+          >
+            Voltar ao login
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const currentBarber = barbers.find((b) => b.id === LOGGED_BARBER_ID);
 
@@ -68,7 +87,7 @@ export function BarberPage() {
       const [today, month, clients] = await Promise.all([
         reportsService.getReports(barbershopId, 'today'),
         reportsService.getReports(barbershopId, 'month'),
-        reportsService.getBarberReport(barbershopId, parseInt(LOGGED_BARBER_ID), 'today'),
+        reportsService.getBarberReport(barbershopId, parseInt(LOGGED_BARBER_ID!), 'today'),
       ]);
       setStatsData({ today, month, clients });
     } catch (err) {
@@ -82,7 +101,7 @@ export function BarberPage() {
     setLoading(true);
     setError(null);
     try {
-      const next = await queueService.callNext(LOGGED_BARBER_ID, barbershopId);
+      const next = await queueService.callNext(LOGGED_BARBER_ID!, barbershopId);
       if (next) {
         setBarberStatus('serving');
       }
@@ -99,7 +118,7 @@ export function BarberPage() {
     setLoading(true);
     setError(null);
     try {
-      await queueService.finishClient(LOGGED_BARBER_ID, barbershopId);
+      await queueService.finishClient(LOGGED_BARBER_ID!, barbershopId);
       setBarberStatus('available');
       await refetchQueue();
     } catch (err) {
@@ -129,7 +148,7 @@ export function BarberPage() {
     const newStatus = barberStatus === 'paused' ? 'available' : 'paused';
     setLoading(true);
     try {
-      await barberService.updateStatus(LOGGED_BARBER_ID, newStatus);
+      await barberService.updateStatus(LOGGED_BARBER_ID!, newStatus);
       setBarberStatus(newStatus);
     } catch (err) {
       console.error('Failed to toggle status:', err);

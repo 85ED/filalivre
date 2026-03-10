@@ -3,29 +3,56 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Container } from '@/components/layout';
-import { Bell, User, AlertCircle, Gamepad2, Scissors, Smartphone, Phone } from 'lucide-react';
+import { Bell, User, AlertCircle, Gamepad2, Phone, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQueueWithToken, useBarbers } from '@/hooks';
-import { DEFAULT_BARBERSHOP_ID } from '@/config/api';
+import { api } from '@/services/api';
+import { API_ENDPOINTS } from '@/config/api';
 import type { QueueItem } from '@/types';
 import { FilaLivreLogo } from '@/components/ui/filalivre-logo';
 
-function getBarbershopId(): number {
-  const stored = localStorage.getItem('barbershop_id');
-  return stored ? parseInt(stored) : DEFAULT_BARBERSHOP_ID;
+interface BarbershopInfo {
+  id: number;
+  name: string;
+  slug: string;
 }
 
 export function ClientQueuePage() {
+  const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
   const [step, setStep] = useState<'name' | 'queue'>('name');
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [currentQueueItem, setCurrentQueueItem] = useState<QueueItem | null>(null);
+  const [barbershopInfo, setBarbershopInfo] = useState<BarbershopInfo | null>(null);
+  const [slugLoading, setSlugLoading] = useState(true);
+  const [slugError, setSlugError] = useState(false);
 
-  const barbershopId = getBarbershopId();
+  // Resolver barbershopId a partir do slug da URL
+  useEffect(() => {
+    if (!slug) { navigate('/'); return; }
+    setSlugLoading(true);
+    api.get<BarbershopInfo>(API_ENDPOINTS.barbershopBySlug(slug))
+      .then((res) => {
+        setBarbershopInfo(res);
+        setSlugError(false);
+      })
+      .catch(() => {
+        setSlugError(true);
+      })
+      .finally(() => setSlugLoading(false));
+  }, [slug, navigate]);
+
+  const barbershopId = barbershopInfo?.id ?? 0;
 
   useEffect(() => {
-    document.title = 'FilaLivre — Entrar na Fila';
-  }, []);
+    if (barbershopInfo) {
+      document.title = `${barbershopInfo.name} — Entrar na Fila`;
+    } else {
+      document.title = 'FilaLivre — Entrar na Fila';
+    }
+  }, [barbershopInfo]);
 
   const { 
     queue, 
@@ -35,12 +62,13 @@ export function ClientQueuePage() {
     error: queueError,
     clientQueueItem,
     recover 
-  } = useQueueWithToken(barbershopId, { autoRefresh: true, refreshInterval: 5000 });
+  } = useQueueWithToken(barbershopId || 1, { autoRefresh: !!barbershopId, refreshInterval: 5000 });
   
-  const { barbers, loading: barbersLoading, error: barbersError } = useBarbers(barbershopId, true, 5000);
+  const { barbers, loading: barbersLoading, error: barbersError } = useBarbers(barbershopId || 1, !!barbershopId, 5000);
 
   // Tentar recuperar cliente do token ao montar
   useEffect(() => {
+    if (!barbershopId) return;
     const recoverClient = async () => {
       const recovered = await recover();
       if (recovered) {
@@ -49,7 +77,7 @@ export function ClientQueuePage() {
       }
     };
     recoverClient();
-  }, [recover]);
+  }, [recover, barbershopId]);
 
   const handleJoinQueue = async (barberId?: string) => {
     if (!clientName) return;
@@ -95,6 +123,31 @@ export function ClientQueuePage() {
 
   const isAlmostReady = userPosition <= 3 && userPosition > 0;
 
+  if (slugLoading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-10 h-10 animate-spin text-neutral-400 mx-auto" />
+          <p className="text-neutral-500">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (slugError || !barbershopInfo) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center space-y-4 max-w-sm px-4">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto" />
+          <h1 className="text-2xl font-bold text-neutral-900">Estabelecimento não encontrado</h1>
+          <p className="text-neutral-600">
+            O link que você acessou não corresponde a nenhum estabelecimento cadastrado.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (step === 'name') {
     return (
       <div className="min-h-screen bg-white pb-24">
@@ -131,34 +184,16 @@ export function ClientQueuePage() {
                 <FilaLivreLogo className="w-10 h-10" />
               </div>
               <div className="space-y-1">
-                <h1 className="text-4xl font-black">FilaLivre</h1>
-                <p className="text-neutral-300 text-lg">Sistema de Fila Digital</p>
+                <h1 className="text-4xl font-black">{barbershopInfo.name}</h1>
+                <p className="text-neutral-300 text-lg">Fila Digital</p>
               </div>
-              <p className="text-neutral-400 text-sm">
-                Escaneie o QR code para entrar na fila
-              </p>
-            </div>
-
-            {/* QR Code Section */}
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-neutral-100 flex items-center justify-center flex-col gap-4">
-              <p className="text-sm text-neutral-600 font-semibold">Ou escaneie uma imagem:</p>
-              <div className="w-48 h-48 bg-neutral-100 rounded-xl flex items-center justify-center border-2 border-dashed border-neutral-300">
-                <div className="text-center">
-                  <Smartphone className="w-10 h-10 text-neutral-400 mx-auto mb-2" />
-                  <p className="text-sm text-neutral-600">QR Code</p>
-                  <p className="text-xs text-neutral-500">localhost:5173/client-queue</p>
-                </div>
-              </div>
-              <p className="text-xs text-neutral-500 text-center max-w-xs">
-                Aponte a câmera do seu celular para este código
-              </p>
             </div>
 
             <div className="text-center space-y-2">
               <div className="w-20 h-20 rounded-full bg-neutral-900 flex items-center justify-center mx-auto mb-4">
                 <User className="w-10 h-10 text-white" />
               </div>
-              <h2 className="text-3xl font-bold text-neutral-900">Ou entre com seu nome</h2>
+              <h2 className="text-3xl font-bold text-neutral-900">Entre com seu nome</h2>
               <p className="text-neutral-600">Digite seu nome ou apelido</p>
             </div>
 
@@ -204,7 +239,7 @@ export function ClientQueuePage() {
             </div>
 
             <div className="bg-neutral-50 rounded-2xl p-6">
-              <h3 className="text-lg font-bold text-neutral-900 mb-4">Ou escolha um barbeiro</h3>
+              <h3 className="text-lg font-bold text-neutral-900 mb-4">Ou escolha um profissional</h3>
               {barbersLoading ? (
                 <div className="text-center py-4 text-neutral-600">Carregando...</div>
               ) : (
@@ -248,7 +283,7 @@ export function ClientQueuePage() {
                     })}
                   {barbers.filter((barber) => barber.status === 'available' || barber.status === 'serving').length === 0 && (
                     <div className="text-center py-6 text-neutral-500">
-                      <p className="text-sm font-medium">Nenhum barbeiro disponível no momento</p>
+                      <p className="text-sm font-medium">Nenhum profissional disponível no momento</p>
                     </div>
                   )}
                 </div>

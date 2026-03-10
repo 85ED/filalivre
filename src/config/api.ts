@@ -2,12 +2,12 @@
 const isProd = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
 export const API_URL = isProd ? 'https://filalivre-production.up.railway.app/api' : 'http://localhost:3001/api';
 
-// Default barbershop ID for now
-export const DEFAULT_BARBERSHOP_ID = 1;
-
 export const API_ENDPOINTS = {
+  // Barbershop lookup
+  barbershopBySlug: (slug: string) => `/barbershops/slug/${slug}`,
+  
   // Queue
-  queue: (barbershopId: number = DEFAULT_BARBERSHOP_ID) => `/queue/${barbershopId}`,
+  queue: (barbershopId: number) => `/queue/${barbershopId}`,
   joinQueue: '/queue/join',
   removeFromQueue: '/queue/remove',
   callNext: '/queue/call-next',
@@ -15,20 +15,20 @@ export const API_ENDPOINTS = {
   skipClient: '/queue/skip',
   
   // Barbers
-  barbers: (barbershopId: number = DEFAULT_BARBERSHOP_ID) => `/barbers/barbershop/${barbershopId}`,
-  availableBarbers: (barbershopId: number = DEFAULT_BARBERSHOP_ID) => `/barbers/available/${barbershopId}`,
+  barbers: (barbershopId: number) => `/barbers/barbershop/${barbershopId}`,
+  availableBarbers: (barbershopId: number) => `/barbers/available/${barbershopId}`,
   updateBarberStatus: '/barbers/status',
 
   // Unified
-  barbershopStatus: (barbershopId: number = DEFAULT_BARBERSHOP_ID) => `/barbershops/${barbershopId}/status`,
+  barbershopStatus: (barbershopId: number) => `/barbershops/${barbershopId}/status`,
 
   // Reports
-  reports: (barbershopId: number = DEFAULT_BARBERSHOP_ID) => `/barbershops/${barbershopId}/reports`,
+  reports: (barbershopId: number) => `/barbershops/${barbershopId}/reports`,
   barberReport: (barbershopId: number, barberId: number) => `/barbershops/${barbershopId}/reports/barber/${barberId}`,
 
   // WhatsApp
-  whatsappConnect: (barbershopId: number = DEFAULT_BARBERSHOP_ID) => `/whatsapp/connect/${barbershopId}`,
-  whatsappDisconnect: (barbershopId: number = DEFAULT_BARBERSHOP_ID) => `/whatsapp/disconnect/${barbershopId}`,
-  whatsappStatus: (barbershopId: number = DEFAULT_BARBERSHOP_ID) => `/whatsapp/status/${barbershopId}`,
-  whatsappQr: (barbershopId: number = DEFAULT_BARBERSHOP_ID) => `/whatsapp/qr/${barbershopId}`,
+  whatsappConnect: (barbershopId: number) => `/whatsapp/connect/${barbershopId}`,
+  whatsappDisconnect: (barbershopId: number) => `/whatsapp/disconnect/${barbershopId}`,
+  whatsappStatus: (barbershopId: number) => `/whatsapp/status/${barbershopId}`,
+  whatsappQr: (barbershopId: number) => `/whatsapp/qr/${barbershopId}`,
 };

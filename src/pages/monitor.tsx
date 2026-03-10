@@ -1,24 +1,45 @@
 import { motion } from 'framer-motion';
 import { Container } from '@/components/layout';
 import { useQueue } from '@/hooks';
-import { DEFAULT_BARBERSHOP_ID } from '@/config/api';
+import { API_ENDPOINTS } from '@/config/api';
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { CheckCircle, Clock, Volume2, MapPin } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { CheckCircle, Clock, Volume2, MapPin, Loader2, AlertCircle } from 'lucide-react';
 import { reportsService } from '@/services/reportsService';
+import { api } from '@/services/api';
 import { FilaLivreLogo } from '@/components/ui/filalivre-logo';
 
-function getBarbershopId(): number {
-  const stored = localStorage.getItem('barbershop_id');
-  return stored ? parseInt(stored) : DEFAULT_BARBERSHOP_ID;
+interface BarbershopInfo {
+  id: number;
+  name: string;
+  slug: string;
 }
 
 export function MonitorPage() {
-  const barbershopId = getBarbershopId();
+  const { slug } = useParams<{ slug: string }>();
+  const [barbershopInfo, setBarbershopInfo] = useState<BarbershopInfo | null>(null);
+  const [slugLoading, setSlugLoading] = useState(true);
+  const [slugError, setSlugError] = useState(false);
+
+  // Resolver barbershopId a partir do slug da URL
+  useEffect(() => {
+    if (!slug) { setSlugError(true); setSlugLoading(false); return; }
+    setSlugLoading(true);
+    api.get<BarbershopInfo>(API_ENDPOINTS.barbershopBySlug(slug))
+      .then((res) => {
+        setBarbershopInfo(res);
+        setSlugError(false);
+      })
+      .catch(() => setSlugError(true))
+      .finally(() => setSlugLoading(false));
+  }, [slug]);
+
+  const barbershopId = barbershopInfo?.id ?? 0;
 
   useEffect(() => {
-    document.title = 'FilaLivre Monitor';
-  }, []);
-  const { queue, loading } = useQueue(barbershopId, true, 2000);
+    document.title = barbershopInfo ? `${barbershopInfo.name} — Monitor` : 'FilaLivre Monitor';
+  }, [barbershopInfo]);
+  const { queue, loading } = useQueue(barbershopId || 1, !!barbershopId, 2000);
   const [time, setTime] = useState(new Date());
   const [prevServing, setPrevServing] = useState<string | null>(null);
   const [highlightNewClient, setHighlightNewClient] = useState(false);
@@ -68,6 +89,25 @@ export function MonitorPage() {
     .slice(0, 5);
   const totalWaiting = queue.filter((q) => q.status === 'waiting').length;
 
+  if (slugLoading) {
+    return (
+      <div className="h-screen bg-neutral-900 flex items-center justify-center">
+        <Loader2 className="w-12 h-12 animate-spin text-neutral-500" />
+      </div>
+    );
+  }
+
+  if (slugError || !barbershopInfo) {
+    return (
+      <div className="h-screen bg-neutral-900 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <AlertCircle className="w-14 h-14 text-red-400 mx-auto" />
+          <h1 className="text-3xl font-bold text-white">Estabelecimento não encontrado</h1>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900 overflow-hidden">
       <Container maxWidth="5xl" className="py-4 space-y-3 h-full flex flex-col">
@@ -79,7 +119,7 @@ export function MonitorPage() {
         >
           <div className="flex items-center justify-center gap-3 mb-2">
             <FilaLivreLogo className="h-10 w-10" variant="light" />
-            <h1 className="text-4xl font-black text-white drop-shadow-lg">FilaLivre</h1>
+            <h1 className="text-4xl font-black text-white drop-shadow-lg">{barbershopInfo.name}</h1>
           </div>
           <div className="flex items-center justify-center gap-3 text-neutral-300">
             <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>

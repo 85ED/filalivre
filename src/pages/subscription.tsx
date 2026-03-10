@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks';
 import { api } from '@/services/api';
-import { DEFAULT_BARBERSHOP_ID } from '@/config/api';
 import { Button } from '@/components/ui/button';
 import {
   CreditCard,
@@ -22,29 +21,38 @@ interface SubscriptionInfo {
   daysRemaining: number | null;
 }
 
+interface Plan {
+  id: number;
+  name: string;
+  price_cents: number;
+  interval: 'monthly' | 'yearly';
+  features: string[] | null;
+}
+
 function getBarbershopId(): number {
   const stored = localStorage.getItem('barbershop_id');
-  return stored ? parseInt(stored) : DEFAULT_BARBERSHOP_ID;
+  return stored ? parseInt(stored) : 0;
 }
 
 export function SubscriptionPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [info, setInfo] = useState<SubscriptionInfo | null>(null);
+  const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [checkoutLoading, setCheckoutLoading] = useState<number | null>(null);
 
   const barbershopId = getBarbershopId();
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/login');
-    }
-  }, [user, authLoading, navigate]);
-
-  useEffect(() => {
-    api
-      .get<SubscriptionInfo>(`/barbershops/${barbershopId}/subscription`)
-      .then(setInfo)
+    Promise.all([
+      api.get<SubscriptionInfo>(`/barbershops/${barbershopId}/subscription`),
+      api.get<{ plans: Plan[] }>('/plans'),
+    ])
+      .then(([subInfo, plansData]) => {
+        setInfo(subInfo);
+        setPlans(plansData.plans);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [barbershopId]);
@@ -60,6 +68,36 @@ export function SubscriptionPage() {
   const isTrial = info?.subscriptionStatus === 'trial';
   const isActive = info?.subscriptionStatus === 'active';
   const isBlocked = info?.blocked;
+
+  const handleCheckout = async (planId: number) => {
+    setCheckoutLoading(planId);
+    try {
+      const data = await api.post<{ checkout_url: string }>('/subscription/checkout', {
+        planId,
+        barbershopId,
+      });
+      if (data.checkout_url) {
+        window.location.href = data.checkout_url;
+      }
+    } catch (err: any) {
+      console.error('Checkout error:', err);
+      alert(err?.data?.error || err?.message || 'Erro ao iniciar checkout');
+    } finally {
+      setCheckoutLoading(null);
+    }
+  };
+
+  const handlePortal = async () => {
+    try {
+      const data = await api.post<{ portal_url: string }>('/subscription/portal', {});
+      if (data.portal_url) {
+        window.location.href = data.portal_url;
+      }
+    } catch (err: any) {
+      console.error('Portal error:', err);
+      alert(err?.data?.error || err?.message || 'Erro ao abrir portal');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -140,46 +178,70 @@ export function SubscriptionPage() {
           )}
         </motion.div>
 
-        {/* Plan */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm"
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <Sparkles className="w-5 h-5 text-purple-500" />
-            <h2 className="font-bold text-neutral-900">Plano FilaLivre Pro</h2>
-          </div>
-          <ul className="space-y-2 text-sm text-neutral-700 mb-6">
-            {[
-              'Fila digital ilimitada',
-              'Painel administrativo completo',
-              'Relatórios e KPIs',
-              'Integração WhatsApp',
-              'Monitor TV em tempo real',
-              'Suporte prioritário',
-            ].map((feature) => (
-              <li key={feature} className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                {feature}
-              </li>
-            ))}
-          </ul>
-
+        {/* Manage subscription button (active only) */}
+        {isActive && (
           <Button
-            className="w-full h-12 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-xl text-base"
-            disabled={isActive}
+            onClick={handlePortal}
+            variant="outline"
+            className="w-full h-12 rounded-xl font-semibold"
           >
-            <CreditCard className="w-5 h-5 mr-2" />
-            {isActive ? 'Plano ativo' : 'Assinar agora'}
+            Gerenciar assinatura
           </Button>
-          {!isActive && (
-            <p className="text-center text-xs text-neutral-400 mt-2">
-              Integração com pagamento disponível em breve
+        )}
+
+        {/* Plans */}
+        {plans.map((plan, i) => (
+          <motion.div
+            key={plan.id}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 + i * 0.05 }}
+            className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles className="w-5 h-5 text-purple-500" />
+              <h2 className="font-bold text-neutral-900">{plan.name}</h2>
+            </div>
+            <p className="text-2xl font-bold text-neutral-900 mb-4">
+              R$ {(plan.price_cents / 100).toFixed(2)}
+              <span className="text-sm font-normal text-neutral-500">/{plan.interval === 'monthly' ? 'mês' : 'ano'}</span>
             </p>
-          )}
-        </motion.div>
+            {plan.features && plan.features.length > 0 && (
+              <ul className="space-y-2 text-sm text-neutral-700 mb-6">
+                {plan.features.map((feature) => (
+                  <li key={feature} className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Button
+              onClick={() => !isActive && handleCheckout(plan.id)}
+              className="w-full h-12 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-xl text-base"
+              disabled={isActive || checkoutLoading === plan.id}
+            >
+              {checkoutLoading === plan.id ? (
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              ) : (
+                <CreditCard className="w-5 h-5 mr-2" />
+              )}
+              {isActive ? 'Plano ativo' : 'Assinar agora'}
+            </Button>
+          </motion.div>
+        ))}
+
+        {plans.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm text-center"
+          >
+            <Sparkles className="w-8 h-8 text-purple-400 mx-auto mb-2" />
+            <p className="text-neutral-600 text-sm">Planos de assinatura estarão disponíveis em breve.</p>
+          </motion.div>
+        )}
       </div>
 
       {/* Footer */}

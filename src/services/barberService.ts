@@ -1,5 +1,5 @@
 import { api } from './api';
-import { API_ENDPOINTS, DEFAULT_BARBERSHOP_ID } from '@/config/api';
+import { API_ENDPOINTS } from '@/config/api';
 import type { Barber } from '@/types';
 
 interface BackendBarber {
@@ -26,7 +26,7 @@ const mapBarber = (barber: BackendBarber): Barber => ({
 });
 
 export const barberService = {
-  async getBarbers(barbershopId: number = DEFAULT_BARBERSHOP_ID): Promise<Barber[]> {
+  async getBarbers(barbershopId: number): Promise<Barber[]> {
     try {
       const response = await api.get<{ barbers: BackendBarber[] }>(
         API_ENDPOINTS.barbers(barbershopId)
@@ -38,7 +38,7 @@ export const barberService = {
     }
   },
 
-  async getAvailableBarbers(barbershopId: number = DEFAULT_BARBERSHOP_ID): Promise<Barber[]> {
+  async getAvailableBarbers(barbershopId: number): Promise<Barber[]> {
     try {
       const response = await api.get<{ barbers: BackendBarber[] }>(
         API_ENDPOINTS.availableBarbers(barbershopId)
@@ -63,7 +63,7 @@ export const barberService = {
     }
   },
 
-  async createBarber(barbershopId: number, data: { name: string; photo_url?: string | null; role?: string | null; active?: boolean }): Promise<Barber> {
+  async createBarber(barbershopId: number, data: { name: string; photo_url?: string | null; role?: string | null; active?: boolean; email?: string; password?: string }): Promise<Barber> {
     try {
       const response = await api.post<BackendBarber>('/barbers', {
         barbershopId,

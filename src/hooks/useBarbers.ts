@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { barberService } from '@/services';
-import { DEFAULT_BARBERSHOP_ID } from '@/config/api';
 import type { Barber } from '@/types';
 
-export function useBarbers(barbershopId: number = DEFAULT_BARBERSHOP_ID, autoRefresh = false, refreshInterval = 10000) {
+export function useBarbers(barbershopId: number, autoRefresh = false, refreshInterval = 10000) {
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);

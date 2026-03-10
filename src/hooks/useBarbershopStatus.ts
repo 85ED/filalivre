@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '@/services/api';
-import { API_ENDPOINTS, DEFAULT_BARBERSHOP_ID } from '@/config/api';
+import { API_ENDPOINTS } from '@/config/api';
 import type { QueueItem } from '@/types';
 import type { Barber } from '@/types';
 
@@ -70,7 +70,7 @@ const mapQueueItem = (q: BackendQueueItem): QueueItem => ({
 });
 
 export function useBarbershopStatus(
-  barbershopId: number = DEFAULT_BARBERSHOP_ID,
+  barbershopId: number,
   refreshInterval = 10000
 ) {
   const [barbershop, setBarbershop] = useState<BarbershopInfo | null>(null);

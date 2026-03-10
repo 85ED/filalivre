@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS barbers (
   id INT AUTO_INCREMENT PRIMARY KEY,
   barbershop_id INT NOT NULL,
+  user_id INT NULL,
   name VARCHAR(120) NOT NULL,
   photo_url VARCHAR(500) NULL,
   role VARCHAR(60) NULL,
@@ -32,7 +33,8 @@ CREATE TABLE IF NOT EXISTS barbers (
   status ENUM('available', 'serving', 'paused') DEFAULT 'available',
   current_client_id INT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (barbershop_id) REFERENCES barbershops(id) ON DELETE CASCADE
+  FOREIGN KEY (barbershop_id) REFERENCES barbershops(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- Table: queue

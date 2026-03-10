@@ -1,4 +1,5 @@
 import User from '../models/User.js';
+import Barber from '../models/Barber.js';
 import { hashPassword, comparePassword, generateJWT, validateEmail, createValidationError, createNotFoundError } from '../middlewares/validators.js';
 
 export class AuthService {
@@ -66,7 +67,7 @@ export class AuthService {
 
     const token = generateJWT(user);
 
-    return {
+    const response = {
       user: {
         id: user.id,
         name: user.name,
@@ -76,6 +77,16 @@ export class AuthService {
       },
       token,
     };
+
+    // Se é barbeiro, buscar barber_id vinculado
+    if (user.role === 'barber') {
+      const barber = await Barber.findByUserId(user.id);
+      if (barber) {
+        response.user.barberId = barber.id;
+      }
+    }
+
+    return response;
   }
 
   static async createAdminUser(email, password, name, barbershopId) {

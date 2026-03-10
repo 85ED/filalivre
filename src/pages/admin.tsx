@@ -30,7 +30,7 @@ import { useNavigate } from 'react-router-dom';
 import { useBarbershopStatus, useAuth } from '@/hooks';
 import { reportsService } from '@/services/reportsService';
 import type { ReportsData, BarberClientData } from '@/services/reportsService';
-import { DEFAULT_BARBERSHOP_ID, API_ENDPOINTS } from '@/config/api';
+import { API_ENDPOINTS } from '@/config/api';
 import { api } from '@/services/api';
 import { barberService } from '@/services/barberService';
 import { queueService } from '@/services/queueService';
@@ -48,7 +48,7 @@ const PERIOD_LABELS: Record<Period, string> = {
 
 function getBarbershopId(): number {
   const stored = localStorage.getItem('barbershop_id');
-  return stored ? parseInt(stored) : DEFAULT_BARBERSHOP_ID;
+  return stored ? parseInt(stored) : 0;
 }
 
 export function AdminPage() {
@@ -73,7 +73,7 @@ export function AdminPage() {
   // Professional CRUD state
   const [showProModal, setShowProModal] = useState(false);
   const [editingPro, setEditingPro] = useState<Barber | null>(null);
-  const [proForm, setProForm] = useState({ name: '', photo_url: '', role: '' });
+  const [proForm, setProForm] = useState({ name: '', photo_url: '', role: '', email: '', password: '' });
   const [proLoading, setProLoading] = useState(false);
 
   // Slug copy state
@@ -161,13 +161,13 @@ export function AdminPage() {
   // Professional CRUD handlers
   const openCreatePro = () => {
     setEditingPro(null);
-    setProForm({ name: '', photo_url: '', role: '' });
+    setProForm({ name: '', photo_url: '', role: '', email: '', password: '' });
     setShowProModal(true);
   };
 
   const openEditPro = (barber: Barber) => {
     setEditingPro(barber);
-    setProForm({ name: barber.name, photo_url: barber.photoUrl || '', role: barber.role || '' });
+    setProForm({ name: barber.name, photo_url: barber.photoUrl || '', role: barber.role || '', email: '', password: '' });
     setShowProModal(true);
   };
 
@@ -182,11 +182,16 @@ export function AdminPage() {
           role: proForm.role.trim() || null,
         });
       } else {
-        await barberService.createBarber(barbershopId, {
+        const payload: Record<string, unknown> = {
           name: proForm.name.trim(),
           photo_url: proForm.photo_url.trim() || null,
           role: proForm.role.trim() || null,
-        });
+        };
+        if (proForm.email.trim() && proForm.password.trim()) {
+          payload.email = proForm.email.trim();
+          payload.password = proForm.password.trim();
+        }
+        await barberService.createBarber(barbershopId, payload);
       }
       setShowProModal(false);
       refetchStatus();
@@ -229,7 +234,7 @@ export function AdminPage() {
   // Copy slug link
   const handleCopySlug = () => {
     if (!barbershop?.slug) return;
-    const url = `${window.location.origin}/queue/${barbershop.slug}`;
+    const url = `${window.location.origin}/${barbershop.slug}`;
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -954,6 +959,33 @@ export function AdminPage() {
                     placeholder="Ex: Barbeiro, Cabeleireiro, Manicure..."
                   />
                 </div>
+                {!editingPro && (
+                  <>
+                    <div className="border-t border-neutral-100 pt-4">
+                      <p className="text-xs font-semibold text-neutral-500 mb-3">LOGIN DO PROFISSIONAL (opcional)</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-neutral-700 mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={proForm.email}
+                        onChange={(e) => setProForm(f => ({ ...f, email: e.target.value }))}
+                        className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-neutral-900 focus:border-transparent outline-none text-sm"
+                        placeholder="profissional@email.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-neutral-700 mb-1">Senha</label>
+                      <input
+                        type="password"
+                        value={proForm.password}
+                        onChange={(e) => setProForm(f => ({ ...f, password: e.target.value }))}
+                        className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-neutral-900 focus:border-transparent outline-none text-sm"
+                        placeholder="Mínimo 6 caracteres"
+                      />
+                    </div>
+                  </>
+                )}
                 <div className="flex gap-3 pt-2">
                   <button
                     onClick={() => setShowProModal(false)}

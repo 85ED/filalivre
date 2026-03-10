@@ -1,15 +1,24 @@
 import BarberService from '../services/BarberService.js';
+import AuthService from '../services/AuthService.js';
 
 export class BarberController {
   static async create(req, res, next) {
     try {
-      const { barbershopId, name, photo_url, role, active } = req.body;
+      const { barbershopId, name, photo_url, role, active, email, password } = req.body;
 
       if (!barbershopId || !name) {
         return res.status(400).json({ error: 'Barbershop ID and name are required' });
       }
 
-      const barber = await BarberService.createBarber(barbershopId, name, { photo_url, role, active });
+      let userId = null;
+
+      // Se email e password foram fornecidos, criar conta de usuário
+      if (email && password) {
+        const result = await AuthService.register(email, password, name, barbershopId, 'barber');
+        userId = result.user.id;
+      }
+
+      const barber = await BarberService.createBarber(barbershopId, name, { photo_url, role, active, user_id: userId });
       res.status(201).json(barber);
     } catch (error) {
       next(error);

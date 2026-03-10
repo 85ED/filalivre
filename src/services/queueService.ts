@@ -1,5 +1,5 @@
 import { api } from './api';
-import { API_ENDPOINTS, DEFAULT_BARBERSHOP_ID } from '@/config/api';
+import { API_ENDPOINTS } from '@/config/api';
 import type { QueueItem, CreateQueueItemDto } from '@/types';
 
 interface BackendQueueItem {
@@ -36,7 +36,7 @@ const mapBackendQueueItem = (item: BackendQueueItem): QueueItem => ({
 });
 
 export const queueService = {
-  async getQueue(barbershopId: number = DEFAULT_BARBERSHOP_ID): Promise<QueueItem[]> {
+  async getQueue(barbershopId: number): Promise<QueueItem[]> {
     try {
       const response = await api.get<BackendQueueResponse>(
         API_ENDPOINTS.queue(barbershopId)
@@ -48,7 +48,7 @@ export const queueService = {
     }
   },
 
-  async getQueueItem(id: string, barbershopId: number = DEFAULT_BARBERSHOP_ID): Promise<QueueItem> {
+  async getQueueItem(id: string, barbershopId: number): Promise<QueueItem> {
     try {
       const queue = await this.getQueue(barbershopId);
       const item = queue.find((q) => q.id === id);
@@ -63,7 +63,7 @@ export const queueService = {
   async joinQueue(data: { name: string; barbershopId?: number; barberId?: string | null; phone?: string | null }): Promise<QueueItem & { token: string }> {
     try {
       const payload: Record<string, unknown> = {
-        barbershopId: data.barbershopId || DEFAULT_BARBERSHOP_ID,
+        barbershopId: data.barbershopId,
         clientName: data.name,
       };
       if (data.barberId) {
@@ -118,12 +118,14 @@ export const queueService = {
 
   async removeFromQueue(
     id: string,
-    barbershopId: number = DEFAULT_BARBERSHOP_ID
+    barbershopId: number,
+    token?: string
   ): Promise<void> {
     try {
       await api.post(API_ENDPOINTS.removeFromQueue, {
         queueId: parseInt(id),
         barbershopId,
+        ...(token && { token }),
       });
     } catch (error) {
       console.error('Failed to remove from queue:', error);
@@ -133,7 +135,7 @@ export const queueService = {
 
   async skipClient(
     id: string,
-    barbershopId: number = DEFAULT_BARBERSHOP_ID
+    barbershopId: number
   ): Promise<void> {
     try {
       await api.post(API_ENDPOINTS.skipClient, {
@@ -148,7 +150,7 @@ export const queueService = {
 
   async callNext(
     barberId: string,
-    barbershopId: number = DEFAULT_BARBERSHOP_ID
+    barbershopId: number
   ): Promise<QueueItem | null> {
     try {
       const response = await api.post<{ client: BackendQueueItem | null }>(
@@ -167,7 +169,7 @@ export const queueService = {
 
   async finishClient(
     barberId: string,
-    barbershopId: number = DEFAULT_BARBERSHOP_ID
+    barbershopId: number
   ): Promise<{ finished: boolean; nextClient: QueueItem | null }> {
     try {
       const response = await api.post<{

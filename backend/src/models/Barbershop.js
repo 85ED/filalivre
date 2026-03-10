@@ -61,6 +61,18 @@ export class Barbershop {
       fields.push('trial_expires_at = ?');
       values.push(trial_expires_at);
     }
+    if (data.stripe_customer_id !== undefined) {
+      fields.push('stripe_customer_id = ?');
+      values.push(data.stripe_customer_id);
+    }
+    if (data.stripe_subscription_id !== undefined) {
+      fields.push('stripe_subscription_id = ?');
+      values.push(data.stripe_subscription_id);
+    }
+    if (data.plan_id !== undefined) {
+      fields.push('plan_id = ?');
+      values.push(data.plan_id);
+    }
 
     if (fields.length === 0) return false;
 

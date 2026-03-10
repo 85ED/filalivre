@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { api } from '@/services/api';
-import { DEFAULT_BARBERSHOP_ID } from '@/config/api';
 
 interface SubscriptionInfo {
   subscriptionStatus: string;
@@ -15,7 +14,11 @@ export function useSubscription() {
 
   useEffect(() => {
     const stored = localStorage.getItem('barbershop_id');
-    const barbershopId = stored ? parseInt(stored) : DEFAULT_BARBERSHOP_ID;
+    if (!stored) {
+      setLoading(false);
+      return;
+    }
+    const barbershopId = parseInt(stored);
 
     api
       .get<SubscriptionInfo>(`/barbershops/${barbershopId}/subscription`)

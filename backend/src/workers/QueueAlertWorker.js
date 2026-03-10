@@ -3,16 +3,30 @@ import { sendMessage, isSessionActive } from '../services/WhatsAppService.js';
 
 export async function checkQueueAlerts() {
   try {
-    const [clients] = await pool.query(
+    // Buscar clientes com telefone, esperando, que ainda não receberam alerta
+    const [candidates] = await pool.query(
       `SELECT * FROM queue
        WHERE status = 'waiting'
-       AND position <= 3
        AND alert_sent = false
        AND phone IS NOT NULL
        AND phone != ''`
     );
 
-    for (const client of clients) {
+    for (const client of candidates) {
+      // Contar quantas pessoas estão à frente (waiting, mesma barbearia, position menor)
+      const [ahead] = await pool.query(
+        `SELECT COUNT(*) as cnt FROM queue
+         WHERE barbershop_id = ?
+         AND status = 'waiting'
+         AND position < ?`,
+        [client.barbershop_id, client.position]
+      );
+
+      const peopleAhead = ahead[0].cnt;
+
+      // Alertar quando exatamente 3 pessoas (ou menos) estão à frente
+      if (peopleAhead > 3) continue;
+
       const sessionName = 'barbershop_' + client.barbershop_id;
 
       if (!isSessionActive(sessionName)) {
@@ -20,7 +34,9 @@ export async function checkQueueAlerts() {
       }
 
       try {
-        const message = `Olá ${client.name}! Faltam apenas 3 atendimentos para sua vez. Dirija-se à barbearia.`;
+        const message = peopleAhead === 0
+          ? `Olá ${client.name}! Você é o próximo. Dirija-se ao atendimento.`
+          : `Olá ${client.name}! Faltam apenas ${peopleAhead} pessoa${peopleAhead > 1 ? 's' : ''} para sua vez. Prepare-se!`;
 
         await sendMessage(sessionName, client.phone, message);
 
@@ -29,7 +45,7 @@ export async function checkQueueAlerts() {
           [client.id]
         );
 
-        console.log(`[QueueAlert] WhatsApp enviado para ${client.name} (${client.phone})`);
+        console.log(`[QueueAlert] WhatsApp enviado para ${client.name} (${client.phone}) - ${peopleAhead} à frente`);
       } catch (err) {
         console.error(`[QueueAlert] Erro ao enviar WhatsApp para ${client.name}:`, err.message);
       }
