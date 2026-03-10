@@ -3,7 +3,7 @@ import { BackgroundPaths } from '@/components/ui/background-paths';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowRight, Smartphone, Eye, Bell, CircleCheck as CheckCircle, User, LogIn, X, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowRight, Smartphone, Eye, Bell, CircleCheck as CheckCircle, User, LogIn, X, Loader2, AlertCircle, ChevronDown, DollarSign, Shield, Zap, Users, BarChart3, MessageCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { FilaLivreLogo } from '@/components/ui/filalivre-logo';
@@ -24,6 +24,7 @@ export function LandingPage() {
   const [signupLoading, setSignupLoading] = useState(false);
   const { signup } = useAuth();
   const navigate = useNavigate();
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   useEffect(() => {
     document.title = 'FilaLivre — Sistema de fila inteligente';
@@ -296,7 +297,72 @@ export function LandingPage() {
         </div>
       </section>
 
+      {/* Preço */}
       <section className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-16"
+          >
+            <h2 className="text-4xl sm:text-5xl font-bold text-neutral-900 mb-4">
+              Preço simples e justo
+            </h2>
+            <p className="text-xl text-neutral-600">Pague apenas pelo que usa. Sem planos confusos.</p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="max-w-lg mx-auto"
+          >
+            <div className="bg-white rounded-2xl p-8 sm:p-10 shadow-xl border-2 border-neutral-900 relative">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-neutral-900 text-white text-sm font-bold px-4 py-1 rounded-full">
+                7 dias grátis
+              </div>
+              <div className="text-center mb-8">
+                <div className="flex items-baseline justify-center gap-1 mb-2">
+                  <span className="text-lg text-neutral-500">R$</span>
+                  <span className="text-6xl font-black text-neutral-900">35</span>
+                  <span className="text-neutral-500">/mês</span>
+                </div>
+                <p className="text-neutral-600 text-lg">por profissional ativo</p>
+              </div>
+              <div className="space-y-3 mb-8">
+                {[
+                  'Fila digital em tempo real',
+                  'Painel administrativo completo',
+                  'Relatórios e estatísticas',
+                  'Alertas automáticos por WhatsApp',
+                  'Link público personalizado',
+                  'Monitor TV para o estabelecimento',
+                  'Cobrança proporcional ao crescimento',
+                  'Sem taxa de setup, sem contrato',
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                    <span className="text-neutral-700">{item}</span>
+                  </div>
+                ))}
+              </div>
+              <Button
+                size="lg"
+                onClick={() => setShowSignup(true)}
+                className="w-full bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-lg h-14 font-semibold"
+              >
+                Experimentar grátis
+                <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
+              <p className="text-center text-sm text-neutral-400 mt-3">Sem cartão de crédito para começar</p>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Benefícios */}
+      <section className="py-24 bg-neutral-50">
         <div className="max-w-7xl mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -347,7 +413,167 @@ export function LandingPage() {
         </div>
       </section>
 
+      {/* Sobre a Plataforma */}
+      <section className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-16"
+          >
+            <h2 className="text-4xl sm:text-5xl font-bold text-neutral-900 mb-4">
+              A plataforma
+            </h2>
+            <p className="text-xl text-neutral-600">Tudo que você precisa para gerenciar filas de atendimento</p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              {
+                icon: Users,
+                title: 'Fila digital',
+                description: 'Seus clientes entram na fila pelo celular, sem instalar nada. Basta acessar o link do seu estabelecimento.',
+                color: 'from-blue-500 to-cyan-500',
+              },
+              {
+                icon: BarChart3,
+                title: 'Painel do administrador',
+                description: 'Visão geral em tempo real: fila, atendimentos, profissionais ativos e relatórios detalhados.',
+                color: 'from-purple-500 to-pink-500',
+              },
+              {
+                icon: Smartphone,
+                title: 'Tela do profissional',
+                description: 'Cada profissional controla seus atendimentos pelo celular: chamar, finalizar e acompanhar a fila.',
+                color: 'from-emerald-500 to-teal-500',
+              },
+              {
+                icon: Eye,
+                title: 'Monitor TV',
+                description: 'Exiba a fila no monitor do estabelecimento. Seus clientes veem quem está sendo atendido e qual a posição.',
+                color: 'from-orange-500 to-amber-500',
+              },
+              {
+                icon: MessageCircle,
+                title: 'Alertas por WhatsApp',
+                description: 'Quando chegar perto da vez, o cliente recebe um aviso automático no WhatsApp. Sem spam.',
+                color: 'from-green-500 to-emerald-500',
+              },
+              {
+                icon: Shield,
+                title: 'Seguro e confiável',
+                description: 'Dados protegidos, sistema em nuvem com alta disponibilidade. Funciona 24h sem interrupção.',
+                color: 'from-indigo-500 to-violet-500',
+              },
+            ].map((feature, index) => {
+              const Icon = feature.icon;
+              return (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1 }}
+                  className="bg-neutral-50 rounded-2xl p-6 hover:shadow-md transition-shadow"
+                >
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-4`}>
+                    <Icon className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-bold text-neutral-900 mb-2">{feature.title}</h3>
+                  <p className="text-neutral-600 text-sm leading-relaxed">{feature.description}</p>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
       <section className="py-24 bg-neutral-50">
+        <div className="max-w-3xl mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-16"
+          >
+            <h2 className="text-4xl sm:text-5xl font-bold text-neutral-900 mb-4">
+              Perguntas frequentes
+            </h2>
+          </motion.div>
+
+          <div className="space-y-3">
+            {[
+              {
+                q: 'Preciso instalar algum aplicativo?',
+                a: 'Não. O FilaLivre funciona 100% pelo navegador. Seus clientes acessam pelo link do estabelecimento, sem baixar nada.',
+              },
+              {
+                q: 'Como funciona o período de teste?',
+                a: 'Ao criar sua conta, você tem 7 dias gratuitos com acesso completo a todas as funcionalidades. Não pedimos cartão de crédito para começar.',
+              },
+              {
+                q: 'Quanto custa após o período de teste?',
+                a: 'R$35 por mês por profissional ativo. Se você tem 3 profissionais, paga R$105/mês. Simples assim. Sem taxa de setup, sem contrato de fidelidade.',
+              },
+              {
+                q: 'Posso cancelar a qualquer momento?',
+                a: 'Sim. Sem multa, sem burocracia. Você cancela direto pelo painel e o sistema para de cobrar no próximo ciclo.',
+              },
+              {
+                q: 'Funciona para qualquer tipo de estabelecimento?',
+                a: 'Sim! Barbearias, salões de beleza, clínicas, consultórios, laboratórios — qualquer lugar que trabalhe com fila de atendimento presencial.',
+              },
+              {
+                q: 'Como funciona o alerta por WhatsApp?',
+                a: 'Quando o cliente entra na fila e informa o telefone, o sistema envia um aviso automático quando faltam poucos atendimentos para a vez dele. Cada cliente recebe no máximo um alerta.',
+              },
+              {
+                q: 'Meus dados estão seguros?',
+                a: 'Sim. Usamos criptografia, servidores em nuvem com alta disponibilidade e seguimos as melhores práticas de segurança. Seus dados e os dos seus clientes estão protegidos.',
+              },
+              {
+                q: 'Preciso de equipamento especial?',
+                a: 'Não. Basta um celular ou computador com acesso à internet. Para o monitor TV, qualquer tela com navegador serve (Smart TV, tablet, etc).',
+              },
+            ].map((item, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.05 }}
+                className="bg-white rounded-xl border border-neutral-200 overflow-hidden"
+              >
+                <button
+                  onClick={() => setOpenFaq(openFaq === index ? null : index)}
+                  className="w-full flex items-center justify-between p-5 text-left"
+                >
+                  <span className="font-semibold text-neutral-900 pr-4">{item.q}</span>
+                  <ChevronDown className={`w-5 h-5 text-neutral-400 flex-shrink-0 transition-transform ${openFaq === index ? 'rotate-180' : ''}`} />
+                </button>
+                <AnimatePresence>
+                  {openFaq === index && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <p className="px-5 pb-5 text-neutral-600 leading-relaxed">{item.a}</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Sobre o criador */}
+      <section className="py-24 bg-white">
         <div className="max-w-4xl mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -358,7 +584,7 @@ export function LandingPage() {
             <h2 className="text-4xl sm:text-5xl font-bold text-neutral-900 mb-8">
               Sobre
             </h2>
-            <div className="bg-white rounded-2xl p-12 shadow-lg">
+            <div className="bg-neutral-50 rounded-2xl p-12 shadow-lg">
               <div className="w-20 h-20 rounded-full bg-neutral-900 flex items-center justify-center mx-auto mb-6">
                 <User className="w-10 h-10 text-white" />
               </div>
@@ -373,6 +599,26 @@ export function LandingPage() {
               </p>
             </div>
           </motion.div>
+        </div>
+      </section>
+
+      {/* CTA final */}
+      <section className="py-20 bg-neutral-900">
+        <div className="max-w-3xl mx-auto px-4 text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+            Pronto para organizar seu atendimento?
+          </h2>
+          <p className="text-neutral-400 text-lg mb-8">
+            Comece agora com 7 dias grátis. Leva menos de 2 minutos.
+          </p>
+          <Button
+            size="lg"
+            onClick={() => setShowSignup(true)}
+            className="bg-white hover:bg-neutral-100 text-neutral-900 rounded-xl text-lg h-14 px-10 font-semibold"
+          >
+            Criar minha conta grátis
+            <ArrowRight className="ml-2 w-5 h-5" />
+          </Button>
         </div>
       </section>
 
