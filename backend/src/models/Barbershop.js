@@ -69,9 +69,9 @@ export class Barbershop {
       fields.push('stripe_subscription_id = ?');
       values.push(data.stripe_subscription_id);
     }
-    if (data.plan_id !== undefined) {
-      fields.push('plan_id = ?');
-      values.push(data.plan_id);
+    if (data.seat_price_cents !== undefined) {
+      fields.push('seat_price_cents = ?');
+      values.push(data.seat_price_cents);
     }
 
     if (fields.length === 0) return false;

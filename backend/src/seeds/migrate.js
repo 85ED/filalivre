@@ -1,3 +1,4 @@
+import '../../env.js';
 import pool from '../config/database.js';
 
 export async function runMigrations() {
@@ -221,6 +222,34 @@ export async function runMigrations() {
             if (cols.length === 0) {
               await conn.query(`ALTER TABLE barbershops ADD COLUMN plan_id INT NULL`);
             }
+          } catch (e) { /* ignore */ }
+        },
+      ],
+    });
+
+    // Migration 009: per-seat subscription model (remove plans, add seat_price_cents)
+    migrations.push({
+      name: '009_per_seat_subscription',
+      queries: [
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM barbershops LIKE 'seat_price_cents'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE barbershops ADD COLUMN seat_price_cents INT NOT NULL DEFAULT 3500`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM barbershops LIKE 'plan_id'`);
+            if (cols.length > 0) {
+              await conn.query(`ALTER TABLE barbershops DROP COLUMN plan_id`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+        async (conn) => {
+          try {
+            await conn.query(`DROP TABLE IF EXISTS subscription_plans`);
           } catch (e) { /* ignore */ }
         },
       ],

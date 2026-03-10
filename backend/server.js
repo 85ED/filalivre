@@ -6,7 +6,6 @@ import authRoutes from './src/routes/auth.js';
 import queueRoutes from './src/routes/queue.js';
 import barberRoutes from './src/routes/barbers.js';
 import barbershopRoutes from './src/routes/barbershops.js';
-import planRoutes from './src/routes/plans.js';
 import SubscriptionController from './src/controllers/SubscriptionController.js';
 import StripeWebhookController from './src/controllers/StripeWebhookController.js';
 import { runMigrations } from './src/seeds/migrate.js';
@@ -50,11 +49,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/queue', queueRoutes);
 app.use('/api/barbers', barberRoutes);
 app.use('/api/barbershops', barbershopRoutes);
-app.use('/api/plans', planRoutes);
 
-// Subscription (Stripe)
+// Subscription (Stripe) — per-seat model
 app.post('/api/subscription/checkout', authMiddleware, roleMiddleware(['admin', 'owner']), SubscriptionController.createCheckout);
 app.post('/api/subscription/portal', authMiddleware, roleMiddleware(['admin', 'owner']), SubscriptionController.getPortalSession);
+app.get('/api/subscription/seat-info', authMiddleware, roleMiddleware(['admin', 'owner']), SubscriptionController.getSeatInfo);
 
 // WhatsApp routes and worker (requires Chrome/Puppeteer - disabled in minimal containers)
 if (WHATSAPP_ENABLED) {

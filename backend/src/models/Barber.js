@@ -107,6 +107,14 @@ export class Barber {
     );
     return rows[0].count;
   }
+
+  static async countActiveByBarbershop(barbershopId) {
+    const [rows] = await pool.query(
+      'SELECT COUNT(*) as count FROM barbers WHERE barbershop_id = ? AND active = true',
+      [barbershopId]
+    );
+    return rows[0].count;
+  }
 }
 
 export default Barber;

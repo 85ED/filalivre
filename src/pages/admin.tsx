@@ -78,6 +78,7 @@ export function AdminPage() {
 
   // Slug copy state
   const [copied, setCopied] = useState(false);
+  const [copiedMonitor, setCopiedMonitor] = useState(false);
 
   const fetchReports = useCallback(async () => {
     setReportsLoading(true);
@@ -299,28 +300,29 @@ export function AdminPage() {
     : 1;
 
   return (
-    <div className="min-h-screen bg-neutral-50 pb-24">
-      <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
+    <div className="min-h-screen bg-neutral-50 pb-24 max-w-full overflow-x-hidden">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8 space-y-6">
 
         {/* HEADER */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-center justify-between gap-3 max-w-full overflow-hidden">
+          {/* Linha 1: Logo/title + WhatsApp chip */}
+          <div className="flex items-center gap-3 min-w-0">
             {view !== 'overview' ? (
-              <button onClick={goBack} className="p-2 rounded-xl hover:bg-neutral-200 transition-colors">
+              <button onClick={goBack} className="p-2 rounded-xl hover:bg-neutral-200 transition-colors flex-shrink-0">
                 <ChevronLeft className="w-5 h-5 text-neutral-700" />
               </button>
             ) : (
-              <FilaLivreLogo className="w-9 h-9" />
+              <FilaLivreLogo className="w-9 h-9 flex-shrink-0" />
             )}
-            <div>
-              <h1 className="text-3xl font-bold text-neutral-900">
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 truncate">
                 {view === 'overview' && 'Dashboard'}
                 {view === 'byBarber' && 'Atendimentos por Profissional'}
                 {view === 'barberDetail' && selectedBarber?.name}
                 {view === 'whatsapp' && 'WhatsApp'}
                 {view === 'professionals' && 'Profissionais'}
               </h1>
-              <p className="text-neutral-500 text-sm">
+              <p className="text-neutral-500 text-sm truncate">
                 {view === 'overview' && 'Visão geral e relatórios'}
                 {view === 'byBarber' && `Período: ${PERIOD_LABELS[period]}`}
                 {view === 'barberDetail' && `Clientes atendidos — ${PERIOD_LABELS[period]}`}
@@ -330,28 +332,28 @@ export function AdminPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {view === 'overview' && (
-              <button
-                onClick={() => setView('whatsapp')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all border shadow-sm ${
-                  waStatus === 'connected'
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                    : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'
-                }`}
-              >
-                <MessageCircle className="w-4 h-4" />
-                WhatsApp
-                <div className={`w-2 h-2 rounded-full ${waStatus === 'connected' ? 'bg-emerald-500' : 'bg-neutral-400'}`} />
-              </button>
-            )}
+          {view === 'overview' && (
+            <button
+              onClick={() => setView('whatsapp')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all border h-8 flex-shrink-0 ${
+                waStatus === 'connected'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                  : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'
+              }`}
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              WhatsApp
+              <div className={`w-2 h-2 rounded-full ${waStatus === 'connected' ? 'bg-emerald-500' : 'bg-neutral-400'}`} />
+            </button>
+          )}
 
-            <div className="flex gap-1 bg-white rounded-xl p-1 border border-neutral-200 shadow-sm">
-              {(['today', 'week', 'month'] as Period[]).map((p) => (
+          {/* Linha 2: Period tabs */}
+          <div className="flex gap-1 bg-white rounded-xl p-1 border border-neutral-200 shadow-sm">
+            {(['today', 'week', 'month'] as Period[]).map((p) => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
                   period === p
                     ? 'bg-neutral-900 text-white'
                     : 'text-neutral-600 hover:bg-neutral-100'
@@ -362,19 +364,21 @@ export function AdminPage() {
             ))}
           </div>
 
+          {/* Linha 3: Assinatura + Sair */}
+          <div className="flex items-center gap-2">
             <button
               onClick={() => navigate('/assinatura')}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-purple-600 hover:bg-purple-50 border border-purple-200 shadow-sm transition-all"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-purple-600 hover:bg-purple-50 border border-purple-200 shadow-sm transition-all h-9"
             >
-              <CreditCard className="w-4 h-4" />
+              <CreditCard className="w-3.5 h-3.5" />
               Assinatura
             </button>
 
             <button
               onClick={async () => { await logout(); navigate('/login'); }}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-neutral-600 hover:bg-neutral-100 border border-neutral-200 shadow-sm transition-all"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-neutral-600 hover:bg-neutral-100 border border-neutral-200 shadow-sm transition-all h-9"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-3.5 h-3.5" />
               Sair
             </button>
           </div>
@@ -508,26 +512,54 @@ export function AdminPage() {
 
               {/* Slug / Link público */}
               {barbershop?.slug && (
-                <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center">
+                <>
+                <div className="bg-white rounded-2xl p-4 sm:p-6 border border-neutral-200 shadow-sm max-w-full overflow-hidden">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center flex-shrink-0">
                         <Link className="w-5 h-5 text-white" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm text-neutral-500">Link público da fila</p>
-                        <p className="font-semibold text-neutral-900">{window.location.origin}/queue/{barbershop.slug}</p>
+                        <p className="font-semibold text-neutral-900 text-sm break-all">{window.location.origin}/{barbershop.slug}</p>
                       </div>
                     </div>
                     <button
                       onClick={handleCopySlug}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border border-neutral-200 hover:bg-neutral-50 transition-all"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-neutral-200 hover:bg-neutral-50 transition-all flex-shrink-0 h-9"
                     >
                       {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-neutral-500" />}
                       {copied ? 'Copiado!' : 'Copiar'}
                     </button>
                   </div>
                 </div>
+
+                {/* Link do monitor */}
+                <div className="bg-white rounded-2xl p-4 sm:p-6 border border-neutral-200 shadow-sm max-w-full overflow-hidden">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center flex-shrink-0">
+                        <BarChart3 className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm text-neutral-500">Link do monitor do estabelecimento</p>
+                        <p className="font-semibold text-neutral-900 text-sm break-all">{window.location.origin}/monitor/{barbershop.slug}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/monitor/${barbershop.slug}`);
+                        setCopiedMonitor(true);
+                        setTimeout(() => setCopiedMonitor(false), 2000);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-neutral-200 hover:bg-neutral-50 transition-all flex-shrink-0 h-9"
+                    >
+                      {copiedMonitor ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-neutral-500" />}
+                      {copiedMonitor ? 'Copiado!' : 'Copiar'}
+                    </button>
+                  </div>
+                </div>
+                </>
               )}
 
               {/* Queue + Chart */}
@@ -812,10 +844,10 @@ export function AdminPage() {
                 </div>
                 <div className="space-y-3">
                   {[
-                    'Conecte o WhatsApp da barbearia escaneando o QR Code acima.',
+                    'Conecte o WhatsApp do estabelecimento escaneando o QR Code acima.',
                     'Quando o cliente informar o telefone ao entrar na fila, o número é salvo.',
                     'Quando faltarem 3 posições para o atendimento, o sistema envia um alerta automático.',
-                    'A mensagem avisa que faltam poucos atendimentos e que o cliente deve se dirigir à barbearia.',
+                    'A mensagem avisa que faltam poucos atendimentos e que o cliente deve se dirigir ao estabelecimento.',
                     'Cada cliente recebe no máximo um alerta — sem spam.',
                   ].map((text, i) => (
                     <div key={i} className="flex items-start gap-3">
@@ -956,7 +988,7 @@ export function AdminPage() {
                     value={proForm.role}
                     onChange={(e) => setProForm(f => ({ ...f, role: e.target.value }))}
                     className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-neutral-900 focus:border-transparent outline-none text-sm"
-                    placeholder="Ex: Barbeiro, Cabeleireiro, Manicure..."
+                    placeholder="Ex: Atendente, Cabeleireiro, Manicure..."
                   />
                 </div>
                 {!editingPro && (

@@ -1,29 +1,30 @@
 import StripeService from '../services/StripeService.js';
 import Barbershop from '../models/Barbershop.js';
-import SubscriptionPlan from '../models/SubscriptionPlan.js';
+import Barber from '../models/Barber.js';
 
 export class SubscriptionController {
-  // POST /api/subscription/checkout — creates Stripe checkout session
+  // POST /api/subscription/checkout — creates Stripe checkout session (per-seat)
   static async createCheckout(req, res, next) {
     try {
       if (!StripeService.isConfigured()) {
         return res.status(503).json({ error: 'Stripe não configurado. Configure STRIPE_SECRET_KEY.' });
       }
 
-      const { planId } = req.body;
       const barbershopId = req.user?.barbershopId || req.body.barbershopId;
-
-      if (!barbershopId || !planId) {
-        return res.status(400).json({ error: 'barbershopId e planId são obrigatórios' });
+      if (!barbershopId) {
+        return res.status(400).json({ error: 'barbershopId é obrigatório' });
       }
 
-      const [barbershop, plan] = await Promise.all([
-        Barbershop.findById(barbershopId),
-        SubscriptionPlan.findById(planId),
-      ]);
-
+      const barbershop = await Barbershop.findById(barbershopId);
       if (!barbershop) return res.status(404).json({ error: 'Estabelecimento não encontrado' });
-      if (!plan || !plan.active) return res.status(404).json({ error: 'Plano não encontrado ou inativo' });
+
+      // Count active professionals as seats
+      const seatQuantity = await Barber.countActiveByBarbershop(barbershopId);
+      if (seatQuantity === 0) {
+        return res.status(400).json({ error: 'Cadastre pelo menos um profissional ativo antes de assinar.' });
+      }
+
+      const seatPriceCents = barbershop.seat_price_cents || 3500;
 
       // Create or reuse Stripe customer
       let customerId = barbershop.stripe_customer_id;
@@ -40,9 +41,8 @@ export class SubscriptionController {
       const baseUrl = process.env.APP_URL || 'http://localhost:5173';
       const session = await StripeService.createCheckoutSession({
         customerId,
-        planPriceCents: plan.price_cents,
-        planName: plan.name,
-        planInterval: plan.interval,
+        seatPriceCents,
+        seatQuantity,
         barbershopId,
         successUrl: `${baseUrl}/assinatura?session_id={CHECKOUT_SESSION_ID}`,
         cancelUrl: `${baseUrl}/assinatura`,
@@ -76,6 +76,28 @@ export class SubscriptionController {
       });
 
       res.json({ portal_url: session.url });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // GET /api/subscription/seat-info — returns seat info for the barbershop
+  static async getSeatInfo(req, res, next) {
+    try {
+      const barbershopId = req.user?.barbershopId;
+      if (!barbershopId) return res.status(400).json({ error: 'barbershopId obrigatório' });
+
+      const barbershop = await Barbershop.findById(barbershopId);
+      if (!barbershop) return res.status(404).json({ error: 'Estabelecimento não encontrado' });
+
+      const activeCount = await Barber.countActiveByBarbershop(barbershopId);
+      const seatPriceCents = barbershop.seat_price_cents || 3500;
+
+      res.json({
+        activeCount,
+        seatPriceCents,
+        totalCents: seatPriceCents * activeCount,
+      });
     } catch (error) {
       next(error);
     }

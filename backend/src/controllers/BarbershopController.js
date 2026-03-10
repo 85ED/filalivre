@@ -20,11 +20,14 @@ export class BarbershopController {
       const barbershopId = parseInt(req.params.id);
       const barbershop = await Barbershop.findById(barbershopId);
       if (!barbershop) {
-        return res.status(404).json({ error: 'Barbershop not found' });
+        return res.status(404).json({ error: 'Estabelecimento não encontrado' });
       }
       const trialExpired = barbershop.trial_expires_at && new Date(barbershop.trial_expires_at) <= new Date();
       const isActive = barbershop.subscription_status === 'active';
       const blocked = !isActive && trialExpired;
+      const activeCount = await Barber.countActiveByBarbershop(barbershopId);
+      const seatPriceCents = barbershop.seat_price_cents || 3500;
+
       res.json({
         subscriptionStatus: barbershop.subscription_status || 'trial',
         trialExpiresAt: barbershop.trial_expires_at,
@@ -32,6 +35,9 @@ export class BarbershopController {
         daysRemaining: barbershop.trial_expires_at
           ? Math.max(0, Math.ceil((new Date(barbershop.trial_expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
           : null,
+        seatPriceCents,
+        activeCount,
+        totalCents: seatPriceCents * activeCount,
       });
     } catch (error) {
       next(error);

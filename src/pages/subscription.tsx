@@ -11,7 +11,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   Loader2,
-  Sparkles,
+  Users,
 } from 'lucide-react';
 
 interface SubscriptionInfo {
@@ -19,14 +19,9 @@ interface SubscriptionInfo {
   trialExpiresAt: string | null;
   blocked: boolean;
   daysRemaining: number | null;
-}
-
-interface Plan {
-  id: number;
-  name: string;
-  price_cents: number;
-  interval: 'monthly' | 'yearly';
-  features: string[] | null;
+  seatPriceCents: number;
+  activeCount: number;
+  totalCents: number;
 }
 
 function getBarbershopId(): number {
@@ -35,24 +30,18 @@ function getBarbershopId(): number {
 }
 
 export function SubscriptionPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [info, setInfo] = useState<SubscriptionInfo | null>(null);
-  const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
-  const [checkoutLoading, setCheckoutLoading] = useState<number | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const barbershopId = getBarbershopId();
 
   useEffect(() => {
-    Promise.all([
-      api.get<SubscriptionInfo>(`/barbershops/${barbershopId}/subscription`),
-      api.get<{ plans: Plan[] }>('/plans'),
-    ])
-      .then(([subInfo, plansData]) => {
-        setInfo(subInfo);
-        setPlans(plansData.plans);
-      })
+    api
+      .get<SubscriptionInfo>(`/barbershops/${barbershopId}/subscription`)
+      .then(setInfo)
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [barbershopId]);
@@ -68,12 +57,14 @@ export function SubscriptionPage() {
   const isTrial = info?.subscriptionStatus === 'trial';
   const isActive = info?.subscriptionStatus === 'active';
   const isBlocked = info?.blocked;
+  const seatPrice = (info?.seatPriceCents ?? 3500) / 100;
+  const activeCount = info?.activeCount ?? 0;
+  const total = (info?.totalCents ?? 0) / 100;
 
-  const handleCheckout = async (planId: number) => {
-    setCheckoutLoading(planId);
+  const handleCheckout = async () => {
+    setCheckoutLoading(true);
     try {
       const data = await api.post<{ checkout_url: string }>('/subscription/checkout', {
-        planId,
         barbershopId,
       });
       if (data.checkout_url) {
@@ -83,7 +74,7 @@ export function SubscriptionPage() {
       console.error('Checkout error:', err);
       alert(err?.data?.error || err?.message || 'Erro ao iniciar checkout');
     } finally {
-      setCheckoutLoading(null);
+      setCheckoutLoading(false);
     }
   };
 
@@ -120,7 +111,7 @@ export function SubscriptionPage() {
             <CreditCard className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-neutral-900">Assinatura</h1>
-          <p className="text-neutral-500 text-sm">Gerencie seu plano FilaLivre</p>
+          <p className="text-neutral-500 text-sm">Modelo por profissional — pague apenas pelo que usa</p>
         </motion.div>
 
         {/* Status Card */}
@@ -189,59 +180,79 @@ export function SubscriptionPage() {
           </Button>
         )}
 
-        {/* Plans */}
-        {plans.map((plan, i) => (
-          <motion.div
-            key={plan.id}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 + i * 0.05 }}
-            className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm"
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <Sparkles className="w-5 h-5 text-purple-500" />
-              <h2 className="font-bold text-neutral-900">{plan.name}</h2>
+        {/* Per-seat pricing card */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm"
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="w-5 h-5 text-purple-500" />
+            <h2 className="font-bold text-neutral-900">Seu plano</h2>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex justify-between items-center py-2 border-b border-neutral-100">
+              <span className="text-sm text-neutral-600">Profissionais ativos</span>
+              <span className="font-bold text-neutral-900">{activeCount}</span>
             </div>
-            <p className="text-2xl font-bold text-neutral-900 mb-4">
-              R$ {(plan.price_cents / 100).toFixed(2)}
-              <span className="text-sm font-normal text-neutral-500">/{plan.interval === 'monthly' ? 'mês' : 'ano'}</span>
+            <div className="flex justify-between items-center py-2 border-b border-neutral-100">
+              <span className="text-sm text-neutral-600">Valor por profissional</span>
+              <span className="font-bold text-neutral-900">R$ {seatPrice.toFixed(2)}/mês</span>
+            </div>
+            <div className="flex justify-between items-center py-2">
+              <span className="text-sm font-semibold text-neutral-700">Total mensal</span>
+              <span className="text-2xl font-bold text-purple-600">R$ {total.toFixed(2)}</span>
+            </div>
+          </div>
+
+          {activeCount === 0 && (
+            <p className="text-xs text-amber-600 mt-3">
+              Cadastre pelo menos um profissional ativo para assinar.
             </p>
-            {plan.features && plan.features.length > 0 && (
-              <ul className="space-y-2 text-sm text-neutral-700 mb-6">
-                {plan.features.map((feature) => (
-                  <li key={feature} className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-            )}
+          )}
+
+          {!isActive && activeCount > 0 && (
             <Button
-              onClick={() => !isActive && handleCheckout(plan.id)}
-              className="w-full h-12 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-xl text-base"
-              disabled={isActive || checkoutLoading === plan.id}
+              onClick={handleCheckout}
+              className="w-full h-12 mt-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-xl text-base"
+              disabled={checkoutLoading}
             >
-              {checkoutLoading === plan.id ? (
+              {checkoutLoading ? (
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
               ) : (
                 <CreditCard className="w-5 h-5 mr-2" />
               )}
-              {isActive ? 'Plano ativo' : 'Assinar agora'}
+              Assinar agora
             </Button>
-          </motion.div>
-        ))}
+          )}
+        </motion.div>
 
-        {plans.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm text-center"
-          >
-            <Sparkles className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-            <p className="text-neutral-600 text-sm">Planos de assinatura estarão disponíveis em breve.</p>
-          </motion.div>
-        )}
+        {/* Features */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="bg-neutral-50 rounded-2xl p-6"
+        >
+          <h3 className="font-semibold text-neutral-900 mb-3">O que está incluso</h3>
+          <ul className="space-y-2 text-sm text-neutral-700">
+            {[
+              'Fila digital ilimitada',
+              'Painel administrativo completo',
+              'Relatórios e KPIs em tempo real',
+              'Monitor público para clientes',
+              'Notificações WhatsApp',
+              'Cobrança proporcional ao crescimento',
+            ].map((f) => (
+              <li key={f} className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                {f}
+              </li>
+            ))}
+          </ul>
+        </motion.div>
       </div>
 
       {/* Footer */}

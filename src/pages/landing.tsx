@@ -88,7 +88,7 @@ export function LandingPage() {
                 <div className="space-y-2">
                   <Label className="text-neutral-900">Nome do estabelecimento *</Label>
                   <Input
-                    placeholder="Ex: Barbearia do João"
+                    placeholder="Ex: Salão do João"
                     value={signupData.establishmentName}
                     onChange={(e) => setSignupData({ ...signupData, establishmentName: e.target.value })}
                     className="h-12 rounded-xl"

@@ -18,7 +18,7 @@ export class StripeService {
     });
   }
 
-  static async createCheckoutSession({ customerId, customerEmail, planPriceCents, planName, planInterval, barbershopId, successUrl, cancelUrl }) {
+  static async createCheckoutSession({ customerId, customerEmail, seatPriceCents, seatQuantity, barbershopId, successUrl, cancelUrl }) {
     if (!stripe) throw new Error('Stripe não configurado');
     const params = {
       mode: 'subscription',
@@ -27,20 +27,33 @@ export class StripeService {
       line_items: [{
         price_data: {
           currency: 'brl',
-          product_data: { name: `FilaLivre — ${planName}` },
-          unit_amount: planPriceCents,
-          recurring: { interval: planInterval === 'yearly' ? 'year' : 'month' },
+          product_data: { name: 'FilaLivre — Por Profissional' },
+          unit_amount: seatPriceCents,
+          recurring: { interval: 'month' },
         },
-        quantity: 1,
+        quantity: seatQuantity,
       }],
       success_url: successUrl,
       cancel_url: cancelUrl,
-      metadata: { barbershop_id: String(barbershopId), plan_name: planName },
+      metadata: { barbershop_id: String(barbershopId) },
       subscription_data: { metadata: { barbershop_id: String(barbershopId) } },
     };
     if (customerId) params.customer = customerId;
     else if (customerEmail) params.customer_email = customerEmail;
     return stripe.checkout.sessions.create(params);
+  }
+
+  static async updateSubscriptionQuantity(subscriptionId, newQuantity) {
+    if (!stripe) throw new Error('Stripe não configurado');
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    if (!subscription || !subscription.items?.data?.length) return null;
+    return stripe.subscriptions.update(subscriptionId, {
+      items: [{
+        id: subscription.items.data[0].id,
+        quantity: newQuantity,
+      }],
+      proration_behavior: 'create_prorations',
+    });
   }
 
   static async createPortalSession({ customerId, returnUrl }) {

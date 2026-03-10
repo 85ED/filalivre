@@ -1,5 +1,6 @@
 import BarberService from '../services/BarberService.js';
 import AuthService from '../services/AuthService.js';
+import SeatSyncService from '../services/SeatSyncService.js';
 
 export class BarberController {
   static async create(req, res, next) {
@@ -19,6 +20,10 @@ export class BarberController {
       }
 
       const barber = await BarberService.createBarber(barbershopId, name, { photo_url, role, active, user_id: userId });
+
+      // Sync seats with Stripe
+      await SeatSyncService.syncSeats(barbershopId);
+
       res.status(201).json(barber);
     } catch (error) {
       next(error);
@@ -95,6 +100,12 @@ export class BarberController {
       }
 
       const barber = await BarberService.updateBarber(parseInt(barberId), data);
+
+      // Sync seats if active status changed
+      if (data.active !== undefined && barber.barbershop_id) {
+        await SeatSyncService.syncSeats(barber.barbershop_id);
+      }
+
       res.json(barber);
     } catch (error) {
       next(error);
@@ -109,7 +120,17 @@ export class BarberController {
         return res.status(400).json({ error: 'Barber ID is required' });
       }
 
+      // Get barbershop_id before deleting
+      const barber = await BarberService.getBarber(parseInt(barberId));
+      const barbershopId = barber?.barbershop_id;
+
       await BarberService.deleteBarber(parseInt(barberId));
+
+      // Sync seats with Stripe
+      if (barbershopId) {
+        await SeatSyncService.syncSeats(barbershopId);
+      }
+
       res.json({ success: true });
     } catch (error) {
       next(error);

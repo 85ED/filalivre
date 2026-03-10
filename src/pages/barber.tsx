@@ -190,28 +190,30 @@ export function BarberPage() {
           animate={{ opacity: 1, y: 0 }}
           className="space-y-1"
         >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <FilaLivreLogo className="w-9 h-9" />
-              <div>
-                <h1 className="text-4xl font-black text-neutral-900">
-                  {currentBarber?.name || 'Carregando...'}
-                </h1>
-                <p className="text-sm font-semibold text-neutral-500">Profissional &bull; FilaLivre</p>
-              </div>
+          {/* Linha 1: Nome */}
+          <div className="flex items-center gap-3">
+            <FilaLivreLogo className="w-9 h-9 flex-shrink-0" />
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-4xl font-black text-neutral-900 truncate">
+                {currentBarber?.name || 'Carregando...'}
+              </h1>
+              <p className="text-sm font-semibold text-neutral-500">Profissional &bull; FilaLivre</p>
             </div>
-          <div className="flex items-center gap-2">
+          </div>
+          {/* Linha 2: Botões */}
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={openStatsModal}
-              className="p-2 rounded-full border-2 border-neutral-200 text-neutral-500 hover:bg-neutral-100 transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 border-neutral-200 text-neutral-500 hover:bg-neutral-100 transition-all text-xs font-semibold h-9"
               title="Estatísticas"
             >
-              <BarChart3 className="w-4 h-4" />
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Estatísticas</span>
             </button>
             <button
               onClick={handleToggleStatus}
               disabled={loading}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full border-2 font-bold text-sm transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 font-bold text-xs transition-all h-9 ${
                 barberStatus === 'paused'
                   ? 'bg-yellow-50 border-yellow-300 text-yellow-700'
                   : currentClient
@@ -224,17 +226,17 @@ export function BarberPage() {
                   : 'Clique para entrar em pausa'
               }
             >
-              <div className={`w-2.5 h-2.5 rounded-full ${getStatusDotColor()} ${barberStatus !== 'paused' && !currentClient ? 'animate-pulse' : ''}`} />
+              <div className={`w-2 h-2 rounded-full ${getStatusDotColor()} ${barberStatus !== 'paused' && !currentClient ? 'animate-pulse' : ''}`} />
               {getStatusLabel()}
             </button>
             <button
               onClick={() => { logout(); navigate('/login'); }}
-              className="p-2 rounded-full border-2 border-neutral-200 text-neutral-500 hover:bg-neutral-100 transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 border-neutral-200 text-neutral-500 hover:bg-neutral-100 transition-all text-xs font-semibold h-9"
               title="Sair"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-3.5 h-3.5" />
+              Sair
             </button>
-          </div>
           </div>
         </motion.div>
 
