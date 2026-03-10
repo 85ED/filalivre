@@ -24,6 +24,7 @@ import {
   Check,
   Link,
   UserX,
+  ImageIcon,
 } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -79,6 +80,32 @@ export function AdminPage() {
   // Slug copy state
   const [copied, setCopied] = useState(false);
   const [copiedMonitor, setCopiedMonitor] = useState(false);
+
+  // Image URL state
+  const [imageUrl, setImageUrl] = useState('');
+  const [imageUrlSaving, setImageUrlSaving] = useState(false);
+  const [imageUrlSaved, setImageUrlSaved] = useState(false);
+
+  // Sync imageUrl when barbershop data loads
+  useEffect(() => {
+    if (barbershop && (barbershop as any).image_url !== undefined) {
+      setImageUrl((barbershop as any).image_url || '');
+    }
+  }, [barbershop]);
+
+  const handleSaveImageUrl = async () => {
+    setImageUrlSaving(true);
+    try {
+      await api.patch(`/barbershops/${barbershopId}`, { image_url: imageUrl.trim() || null });
+      setImageUrlSaved(true);
+      setTimeout(() => setImageUrlSaved(false), 2000);
+      refetchStatus();
+    } catch (err) {
+      console.error('Failed to save image URL:', err);
+    } finally {
+      setImageUrlSaving(false);
+    }
+  };
 
   const fetchReports = useCallback(async () => {
     setReportsLoading(true);
@@ -561,6 +588,41 @@ export function AdminPage() {
                 </div>
                 </>
               )}
+
+              {/* Imagem do estabelecimento */}
+              <div className="bg-white rounded-2xl p-4 sm:p-6 border border-neutral-200 shadow-sm max-w-full overflow-hidden">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center flex-shrink-0">
+                    <ImageIcon className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0 space-y-3">
+                    <div>
+                      <p className="text-sm text-neutral-500">Imagem do estabelecimento</p>
+                      <p className="text-xs text-neutral-400">Exibida no monitor TV e na tela do cliente</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={imageUrl}
+                        onChange={(e) => setImageUrl(e.target.value)}
+                        placeholder="https://... (URL da imagem)"
+                        className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-neutral-200 text-sm focus:ring-2 focus:ring-neutral-900 focus:border-transparent outline-none"
+                      />
+                      <button
+                        onClick={handleSaveImageUrl}
+                        disabled={imageUrlSaving}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white hover:bg-neutral-800 transition-all flex-shrink-0 h-9 disabled:opacity-50"
+                      >
+                        {imageUrlSaved ? <Check className="w-4 h-4" /> : imageUrlSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                        {imageUrlSaved ? 'Salvo!' : 'Salvar'}
+                      </button>
+                    </div>
+                    {imageUrl && (
+                      <img src={imageUrl} alt="Preview" className="h-16 w-16 rounded-xl object-cover border border-neutral-200" />
+                    )}
+                  </div>
+                </div>
+              </div>
 
               {/* Queue + Chart */}
               <div className="grid md:grid-cols-2 gap-6">

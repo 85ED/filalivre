@@ -16,6 +16,7 @@ interface BarbershopInfo {
   id: number;
   name: string;
   slug: string;
+  image_url?: string | null;
 }
 
 export function ClientQueuePage() {
@@ -180,9 +181,13 @@ export function ClientQueuePage() {
           >
             {/* Branding Header */}
             <div className="bg-gradient-to-r from-neutral-900 to-neutral-800 rounded-3xl p-8 text-white text-center space-y-4">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white mb-3">
-                <FilaLivreLogo className="w-10 h-10" />
-              </div>
+              {barbershopInfo.image_url ? (
+                <img src={barbershopInfo.image_url} alt={barbershopInfo.name} className="w-20 h-20 rounded-2xl object-cover mx-auto shadow-lg" />
+              ) : (
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white mb-3">
+                  <FilaLivreLogo className="w-10 h-10" />
+                </div>
+              )}
               <div className="space-y-1">
                 <h1 className="text-4xl font-black">{barbershopInfo.name}</h1>
                 <p className="text-neutral-300 text-lg">Fila Digital</p>

@@ -73,6 +73,10 @@ export class Barbershop {
       fields.push('seat_price_cents = ?');
       values.push(data.seat_price_cents);
     }
+    if (data.image_url !== undefined) {
+      fields.push('image_url = ?');
+      values.push(data.image_url);
+    }
 
     if (fields.length === 0) return false;
 

@@ -33,6 +33,7 @@ interface BarbershopInfo {
   id: number;
   name: string;
   slug: string;
+  image_url?: string | null;
 }
 
 interface StatusResponse {

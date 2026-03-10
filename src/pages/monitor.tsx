@@ -13,6 +13,7 @@ interface BarbershopInfo {
   id: number;
   name: string;
   slug: string;
+  image_url?: string | null;
 }
 
 export function MonitorPage() {
@@ -118,7 +119,11 @@ export function MonitorPage() {
           className="text-center space-y-1"
         >
           <div className="flex items-center justify-center gap-3 mb-2">
-            <FilaLivreLogo className="h-10 w-10" variant="light" />
+            {barbershopInfo.image_url ? (
+              <img src={barbershopInfo.image_url} alt={barbershopInfo.name} className="h-12 w-12 rounded-xl object-cover shadow-lg" />
+            ) : (
+              <FilaLivreLogo className="h-10 w-10" variant="light" />
+            )}
             <h1 className="text-4xl font-black text-white drop-shadow-lg">{barbershopInfo.name}</h1>
           </div>
           <div className="flex items-center justify-center gap-3 text-neutral-300">

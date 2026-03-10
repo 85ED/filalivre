@@ -29,6 +29,7 @@ interface Barbershop {
   owner_name: string | null;
   email: string | null;
   phone: string | null;
+  image_url: string | null;
   subscription_status: 'trial' | 'active' | 'cancelled' | 'expired' | null;
   trial_expires_at: string | null;
   seat_price_cents: number;
@@ -49,6 +50,7 @@ const emptyForm = {
   owner_name: '',
   email: '',
   phone: '',
+  image_url: '',
   subscription_status: 'trial' as const,
   trial_expires_at: '',
   seat_price: '35.00',
@@ -115,6 +117,7 @@ export function PlatformAdminPage() {
         ? new Date(shop.trial_expires_at).toISOString().split('T')[0]
         : '',
       seat_price: ((shop.seat_price_cents || 3500) / 100).toFixed(2),
+      image_url: shop.image_url || '',
     });
     setFormError(null);
     setShowForm(true);
@@ -139,6 +142,7 @@ export function PlatformAdminPage() {
           ? new Date(form.trial_expires_at).toISOString()
           : undefined,
         seat_price_cents: form.seat_price ? Math.round(parseFloat(form.seat_price) * 100) : undefined,
+        image_url: form.image_url || null,
       };
       if (editingId) {
         await api.patch(`/barbershops/${editingId}`, payload);
@@ -431,6 +435,16 @@ export function PlatformAdminPage() {
                     placeholder="35.00"
                   />
                   <p className="text-xs text-neutral-400 mt-1">Cobrança mensal = valor × profissionais ativos</p>
+                </div>
+                <div>
+                  <Label>Imagem do estabelecimento (URL)</Label>
+                  <Input
+                    type="url"
+                    value={form.image_url}
+                    onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+                    placeholder="https://..."
+                  />
+                  <p className="text-xs text-neutral-400 mt-1">Exibida no monitor e na tela do cliente</p>
                 </div>
               </div>
 

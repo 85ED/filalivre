@@ -255,6 +255,21 @@ export async function runMigrations() {
       ],
     });
 
+    // Migration 010: image_url for barbershops
+    migrations.push({
+      name: '010_barbershop_image_url',
+      queries: [
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM barbershops LIKE 'image_url'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE barbershops ADD COLUMN image_url VARCHAR(500) NULL`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+      ],
+    });
+
     for (const migration of migrations) {
       const [applied] = await pool.query('SELECT * FROM _migrations WHERE name = ?', [migration.name]);
       if (applied.length > 0) continue;
