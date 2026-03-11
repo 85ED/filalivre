@@ -75,17 +75,20 @@ export async function startSession(sessionName) {
 
 export async function startAllSessions() {
   try {
+    console.log("[WhatsApp] [DEBUG] startAllSessions: Iniciando...");
     const [rows] = await pool.query(`
       SELECT barbershop_id
       FROM whatsapp_sessions
       WHERE status = 'connected'
     `);
 
+    console.log(`[WhatsApp] [DEBUG] Encontradas ${rows.length} sessões no banco`);
     console.log(`[WhatsApp] Iniciando ${rows.length} sessões do banco de dados...`);
 
     for (const row of rows) {
       const sessionName = "barbershop_" + row.barbershop_id;
       try {
+        console.log(`[WhatsApp] [DEBUG] Iniciando sessão: ${sessionName}`);
         await startSession(sessionName);
         console.log(`[WhatsApp] Sessão iniciada: ${sessionName}`);
       } catch (err) {
@@ -93,6 +96,7 @@ export async function startAllSessions() {
       }
     }
 
+    console.log("[WhatsApp] [DEBUG] startAllSessions: Concluído com sucesso");
     console.log("[WhatsApp] Todas as sessões foram inicializadas");
   } catch (err) {
     console.error("[WhatsApp] Erro ao carregar sessões do banco:", err.message);

@@ -114,7 +114,7 @@ app.get('/qr/:barbershopId', async (req, res) => {
 });
 
 // Boot
-app.listen(PORT, '0.0.0.0', async () => {
+const server = app.listen(PORT, '0.0.0.0', async () => {
   console.log(`
 ╔══════════════════════════════════════════╗
 ║  FilaLivre WhatsApp Service              ║
@@ -122,9 +122,16 @@ app.listen(PORT, '0.0.0.0', async () => {
 ║  Environment: ${process.env.NODE_ENV || 'development'}
 ╚══════════════════════════════════════════╝
   `);
+  console.log('[WhatsApp] [DEBUG] Servidor iniciou, restaurando sessões do banco...');
   // Restore connected sessions from DB
   await startAllSessions();
+  console.log('[WhatsApp] [DEBUG] Servidor pronto para receber requisições');
 });
+
+// Timeout de segurança para inicialização
+setTimeout(() => {
+  console.log('[WhatsApp] [DEBUG] Servidor está respondendo após 30s de inicialização');
+}, 30000);
 
 process.on('SIGTERM', () => {
   console.log('[WhatsApp] SIGTERM received, shutting down...');
