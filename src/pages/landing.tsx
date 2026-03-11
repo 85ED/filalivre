@@ -25,9 +25,17 @@ export function LandingPage() {
   const { signup } = useAuth();
   const navigate = useNavigate();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [publicPrice, setPublicPrice] = useState(35);
+  const [priceLoading, setPriceLoading] = useState(true);
 
   useEffect(() => {
     document.title = 'FilaLivre — Sistema de fila inteligente';
+    // Fetch public price from backend
+    fetch('/api/barbershops/public-price')
+      .then(res => res.json())
+      .then(data => setPublicPrice(Math.round(data.priceCents / 100)))
+      .catch(() => setPublicPrice(35)) // fallback to 35
+      .finally(() => setPriceLoading(false));
   }, []);
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -325,7 +333,7 @@ export function LandingPage() {
               <div className="text-center mb-8">
                 <div className="flex items-baseline justify-center gap-1 mb-2">
                   <span className="text-lg text-neutral-500">R$</span>
-                  <span className="text-6xl font-black text-neutral-900">35</span>
+                  <span className="text-6xl font-black text-neutral-900">{priceLoading ? '...' : publicPrice}</span>
                   <span className="text-neutral-500">/mês</span>
                 </div>
                 <p className="text-neutral-600 text-lg">por profissional ativo</p>
@@ -515,7 +523,7 @@ export function LandingPage() {
               },
               {
                 q: 'Quanto custa após o período de teste?',
-                a: 'R$35 por mês por profissional ativo. Se você tem 3 profissionais, paga R$105/mês. Simples assim. Sem taxa de setup, sem contrato de fidelidade.',
+                a: `R$${publicPrice} por mês por profissional ativo. Se você tem 3 profissionais, paga R$${publicPrice * 3}/mês. Simples assim. Sem taxa de setup, sem contrato de fidelidade.`,
               },
               {
                 q: 'Posso cancelar a qualquer momento?',

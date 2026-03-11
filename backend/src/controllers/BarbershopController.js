@@ -222,6 +222,30 @@ export class BarbershopController {
       next(error);
     }
   }
+
+  // GET /api/barbershops/public-price — returns the price shown on landing page
+  static async getPublicPrice(req, res, next) {
+    try {
+      const priceCents = await BarbershopService.getPlatformSetting('public_seat_price_cents', '3500');
+      res.json({ priceCents: parseInt(priceCents) });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // PATCH /api/barbershops/public-price — update the price shown on landing page (platform_owner only)
+  static async updatePublicPrice(req, res, next) {
+    try {
+      const { priceCents } = req.body;
+      if (!priceCents || priceCents < 0) {
+        return res.status(400).json({ error: 'priceCents deve ser um número positivo' });
+      }
+      await BarbershopService.updatePlatformSettings('public_seat_price_cents', String(priceCents));
+      res.json({ success: true, priceCents });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default BarbershopController;

@@ -75,10 +75,25 @@ export class BarbershopService {
       phone: data.phone,
       subscription_status: data.subscription_status,
       trial_expires_at: data.trial_expires_at,
+      seat_price_cents: data.seat_price_cents,
+      image_url: data.image_url,
     });
 
     const updated = await Barbershop.findById(id);
     return updated;
+  }
+
+  static async updatePlatformSettings(settingKey, settingValue) {
+    // Update or create platform-wide setting
+    const Setting = (await import('../models/Setting.js')).default;
+    await Setting.upsert(settingKey, settingValue);
+    return { key: settingKey, value: settingValue };
+  }
+
+  static async getPlatformSetting(settingKey, defaultValue = null) {
+    const Setting = (await import('../models/Setting.js')).default;
+    const setting = await Setting.findByKey(settingKey);
+    return setting ? setting.value : defaultValue;
   }
 
   static async deleteBarbershop(id) {

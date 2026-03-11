@@ -5,6 +5,7 @@ import { authMiddleware, roleMiddleware } from '../middlewares/auth.js';
 const router = Router();
 
 // Public routes
+router.get('/public-price', BarbershopController.getPublicPrice);
 router.get('/', BarbershopController.getAll);
 router.get('/id/:id', BarbershopController.getById);
 router.get('/slug/:slug', BarbershopController.getBySlug);
@@ -15,6 +16,7 @@ router.get('/:id/subscription', BarbershopController.getSubscription);
 
 // Platform owner routes
 router.get('/platform/stats', authMiddleware, roleMiddleware(['platform_owner']), BarbershopController.getPlatformStats);
+router.patch('/public-price', authMiddleware, roleMiddleware(['platform_owner']), BarbershopController.updatePublicPrice);
 
 // Protected routes
 router.post('/', authMiddleware, roleMiddleware(['platform_owner', 'owner']), BarbershopController.create);
