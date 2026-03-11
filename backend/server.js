@@ -63,42 +63,75 @@ const WHATSAPP_FALLBACK_URLS = [
 
 // Diagnostic endpoint to test WhatsApp connectivity
 app.get('/api/whatsapp-diagnostic', async (req, res) => {
-  console.log('[Diagnostic] Testing WhatsApp connectivity...');
-  const results = [];
+  console.log('[Diagnostic] Testing WhatsApp connectivity on multiple endpoints...');
+  const results = {
+    health: [],
+    ready: []
+  };
   
+  // Test /health endpoint
   for (const url of WHATSAPP_FALLBACK_URLS) {
     try {
       const testUrl = `${url}/health`;
-      console.log(`[Diagnostic] Tentando: ${testUrl}`);
+      console.log(`[Diagnostic] Testing /health: ${testUrl}`);
       const response = await fetch(testUrl, { timeout: 3000 });
       const data = await response.json();
-      results.push({
+      results.health.push({
         url,
         status: 'SUCCESS',
         httpStatus: response.status,
         response: data
       });
-      console.log(`[Diagnostic] ✓ Sucesso: ${url}`);
-      break; // Stop on first success
+      console.log(`[Diagnostic] ✓ /health success: ${url}`);
+      break;
     } catch (err) {
-      results.push({
+      results.health.push({
         url,
         status: 'FAILED',
         error: err.message,
         errorCode: err.code,
         errorName: err.name
       });
-      console.error(`[Diagnostic] ✗ Falhou ${url}: ${err.code || err.name} - ${err.message}`);
+      console.error(`[Diagnostic] ✗ /health failed ${url}: ${err.code || err.name} - ${err.message}`);
+    }
+  }
+
+  // Test /ready endpoint (more lightweight)
+  for (const url of WHATSAPP_FALLBACK_URLS) {
+    try {
+      const testUrl = `${url}/ready`;
+      console.log(`[Diagnostic] Testing /ready: ${testUrl}`);
+      const response = await fetch(testUrl, { timeout: 3000 });
+      const data = await response.json();
+      results.ready.push({
+        url,
+        status: 'SUCCESS',
+        httpStatus: response.status,
+        response: data
+      });
+      console.log(`[Diagnostic] ✓ /ready success: ${url}`);
+      break;
+    } catch (err) {
+      results.ready.push({
+        url,
+        status: 'FAILED',
+        error: err.message,
+        errorCode: err.code,
+        errorName: err.name
+      });
+      console.error(`[Diagnostic] ✗ /ready failed ${url}: ${err.code || err.name} - ${err.message}`);
     }
   }
   
   res.json({
+    timestamp: new Date(),
     primary_url: WHATSAPP_SERVICE_URL,
     fallback_urls: WHATSAPP_FALLBACK_URLS,
-    test_results: results,
-    timestamp: new Date()
+    test_results: {
+      health_endpoint: results.health,
+      ready_endpoint: results.ready
+    }
   });
-});
 
 app.use('/api/whatsapp', async (req, res) => {
   const relativePath = req.originalUrl.replace(/^\/api\/whatsapp/, '') || '/';

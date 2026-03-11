@@ -21,9 +21,21 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check
+// Health check (super simple, no DB dependencies)
 app.get('/health', (req, res) => {
   res.json({ service: 'filalivre-whatsapp', status: 'ok', timestamp: new Date() });
+});
+
+// Ready check (confirms server is fully initialized)
+app.get('/ready', (req, res) => {
+  res.json({ 
+    service: 'filalivre-whatsapp', 
+    status: 'ready',
+    port: PORT,
+    environment: process.env.NODE_ENV,
+    listening: true,
+    timestamp: new Date() 
+  });
 });
 
 // POST /send — called by worker to send a message
@@ -114,23 +126,48 @@ app.get('/qr/:barbershopId', async (req, res) => {
 });
 
 // Boot
+const SERVER_START_TIME = Date.now();
 const server = app.listen(PORT, '0.0.0.0', async () => {
+  const startupTime = Date.now() - SERVER_START_TIME;
+  console.log(`[WhatsApp] ✓ BINDING CONFIRMADO: 0.0.0.0:${PORT}`);
   console.log(`
 ╔══════════════════════════════════════════╗
 ║  FilaLivre WhatsApp Service              ║
 ║  Port: ${PORT}                           
 ║  Environment: ${process.env.NODE_ENV || 'development'}
+║  Bind: 0.0.0.0:${PORT}
+║  Ready: /ready endpoint disponível
 ╚══════════════════════════════════════════╝
   `);
-  console.log('[WhatsApp] [DEBUG] Servidor iniciou, restaurando sessões do banco...');
-  // Restore connected sessions from DB
-  await startAllSessions();
-  console.log('[WhatsApp] [DEBUG] Servidor pronto para receber requisições');
+  console.log(`[WhatsApp] [DEBUG] Servidor iniciou em ${startupTime}ms`);
+  console.log('[WhatsApp] [DEBUG] Restaurando sessões do banco...');
+  
+  try {
+    await startAllSessions();
+    console.log('[WhatsApp] [DEBUG] Sessões restauradas com sucesso');
+  } catch (err) {
+    console.error('[WhatsApp] [ERROR] Erro ao restaurar sessões:', err.message);
+  }
+  
+  console.log('[WhatsApp] ✓ Servidor pronto para receber requisições em /health e /ready');
+});
+
+// Log se houver erro no listen
+server.on('error', (err) => {
+  console.error('[WhatsApp] [CRITICAL] Erro ao escutar na porta:', err.message);
+  if (err.code === 'EADDRINUSE') {
+    console.error(`[WhatsApp] [CRITICAL] Porta ${PORT} já está em uso!`);
+  }
+  process.exit(1);
+});
+
+server.on('listening', () => {
+  console.log(`[WhatsApp] [DEBUG] Servidor confirmado na porta ${PORT}`);
 });
 
 // Timeout de segurança para inicialização
 setTimeout(() => {
-  console.log('[WhatsApp] [DEBUG] Servidor está respondendo após 30s de inicialização');
+  console.log('[WhatsApp] [DEBUG] ✓ Servidor respondendo após 30s de inicialização');
 }, 30000);
 
 process.on('SIGTERM', () => {
