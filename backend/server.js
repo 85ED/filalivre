@@ -132,6 +132,7 @@ app.get('/api/whatsapp-diagnostic', async (req, res) => {
       ready_endpoint: results.ready
     }
   });
+});
 
 app.use('/api/whatsapp', async (req, res) => {
   const relativePath = req.originalUrl.replace(/^\/api\/whatsapp/, '') || '/';
