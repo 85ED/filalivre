@@ -6,14 +6,13 @@ const sessions = new Map();
 // Armazena último QR gerado por sessão (acessível pelo controller)
 const qrCodes = new Map();
 
-// Detecta Chromium do sistema (Nix no Railway, ou fallback)
+// Detecta Chromium do sistema (apt no Railway, ou fallback)
 function getChromiumPath() {
   const candidates = [
-    process.env.NIXPACKS_CHROMIUM_PATH,
     process.env.PUPPETEER_EXECUTABLE_PATH,
-    '/nix/var/nix/profiles/default/bin/chromium',
-    '/usr/bin/chromium-browser',
     '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/google-chrome-stable',
   ].filter(Boolean);
   for (const p of candidates) {
     if (existsSync(p)) return p;

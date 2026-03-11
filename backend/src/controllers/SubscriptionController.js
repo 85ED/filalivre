@@ -50,7 +50,11 @@ export class SubscriptionController {
 
       res.json({ checkout_url: session.url });
     } catch (error) {
-      next(error);
+      console.error('[Checkout] Error:', error?.message, error?.raw?.message);
+      res.status(500).json({
+        error: 'Erro ao criar sessão de checkout',
+        message: error?.message || 'Erro desconhecido',
+      });
     }
   }
 

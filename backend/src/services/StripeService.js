@@ -1,7 +1,7 @@
 import Stripe from 'stripe';
 
 const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-12-18' })
+  ? new Stripe(process.env.STRIPE_SECRET_KEY)
   : null;
 
 export class StripeService {
@@ -22,7 +22,6 @@ export class StripeService {
     if (!stripe) throw new Error('Stripe não configurado');
     const params = {
       mode: 'subscription',
-      payment_method_types: ['card'],
       locale: 'pt-BR',
       line_items: [{
         price_data: {
