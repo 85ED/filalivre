@@ -68,6 +68,9 @@ export function PlatformAdminPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [publicPrice, setPublicPrice] = useState<string>('35.00');
+  const [priceLoading, setPriceLoading] = useState(false);
+  const [priceSaving, setPriceSaving] = useState(false);
 
   useEffect(() => {
     document.title = 'FilaLivre — Painel da Plataforma';
@@ -75,12 +78,14 @@ export function PlatformAdminPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [shopData, statsData] = await Promise.all([
+      const [shopData, statsData, priceData] = await Promise.all([
         api.get<{ barbershops: Barbershop[] }>('/barbershops'),
         api.get<PlatformStats>('/barbershops/platform/stats'),
+        api.get<{ priceCents: number }>('/barbershops/public-price'),
       ]);
       setBarbershops(shopData.barbershops);
       setStats(statsData);
+      setPublicPrice((priceData.priceCents / 100).toFixed(2));
     } catch (err) {
       console.error('Failed to fetch data:', err);
     } finally {
@@ -171,6 +176,24 @@ export function PlatformAdminPage() {
     }
   };
 
+  const handleSavePublicPrice = async () => {
+    const priceCents = Math.round(parseFloat(publicPrice) * 100);
+    if (priceCents < 0) {
+      alert('Preço não pode ser negativo');
+      return;
+    }
+    setPriceSaving(true);
+    try {
+      await api.patch('/barbershops/public-price', { priceCents });
+      alert('Preço atualizado com sucesso!');
+    } catch (err) {
+      alert('Erro ao atualizar preço');
+      console.error(err);
+    } finally {
+      setPriceSaving(false);
+    }
+  };
+
   const statusBadge = (shop: Barbershop) => {
     const isTrialActive = shop.trial_expires_at && new Date(shop.trial_expires_at) > new Date();
     const daysLeft = shop.trial_expires_at
@@ -248,6 +271,50 @@ export function PlatformAdminPage() {
             </motion.div>
           ))}
         </div>
+
+        {/* Configurações */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm"
+        >
+          <h2 className="text-lg font-semibold text-neutral-900 mb-4">Configurações da Plataforma</h2>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <Label>Preço por profissional (R$/mês)</Label>
+              <p className="text-xs text-neutral-500 mb-2">Valor exibido na página inicial para novos clientes</p>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={publicPrice}
+                  onChange={(e) => setPublicPrice(e.target.value)}
+                  disabled={priceSaving}
+                  className="flex-1"
+                  placeholder="35.00"
+                />
+                <Button
+                  onClick={handleSavePublicPrice}
+                  disabled={priceSaving}
+                  className="gap-2 bg-neutral-900 hover:bg-neutral-800"
+                >
+                  {priceSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                  Salvar
+                </Button>
+              </div>
+            </div>
+            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-4 border border-blue-100">
+              <p className="text-sm font-semibold text-neutral-900 mb-2">Como funciona:</p>
+              <ul className="text-xs text-neutral-700 space-y-1">
+                <li>• Website exibe este preço na página inicial</li>
+                <li>• Cada estabelecimento pode ter preço diferente</li>
+                <li>• Mudanças aqui não afetam assinaturas ativas</li>
+                <li>• Novos clientes verão o novo valor</li>
+              </ul>
+            </div>
+          </div>
+        </motion.div>
 
         {/* Barbershops Table */}
         <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm">
