@@ -125,7 +125,14 @@ export function LoginPage() {
               </Button>
             </form>
 
-            <div className="mt-6 text-center">
+            <div className="mt-6 flex flex-col items-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigate('/esqueci-senha')}
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+              >
+                Esqueci minha senha
+              </button>
               <Link to="/" className="text-neutral-600 hover:text-neutral-900 text-sm">
                 Voltar para o início
               </Link>

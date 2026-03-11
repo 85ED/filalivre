@@ -77,6 +77,28 @@ export class User {
     );
     return rows;
   }
+
+  static async setResetToken(id, token, expiresAt) {
+    await pool.query(
+      'UPDATE users SET reset_token = ?, reset_token_expires_at = ? WHERE id = ?',
+      [token, expiresAt, id]
+    );
+  }
+
+  static async findByResetToken(token) {
+    const [rows] = await pool.query(
+      'SELECT * FROM users WHERE reset_token = ? AND reset_token_expires_at > NOW()',
+      [token]
+    );
+    return rows[0] || null;
+  }
+
+  static async updatePassword(id, passwordHash) {
+    await pool.query(
+      'UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires_at = NULL WHERE id = ?',
+      [passwordHash, id]
+    );
+  }
 }
 
 export default User;

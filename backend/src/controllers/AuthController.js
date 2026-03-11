@@ -76,6 +76,35 @@ export class AuthController {
       next(error);
     }
   }
+
+  static async forgotPassword(req, res, next) {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ error: 'Email é obrigatório' });
+      }
+      await AuthService.forgotPassword(email);
+      // Sempre retorna sucesso para não revelar se email existe
+      res.json({ message: 'Se o email existir em nossa base, enviaremos um link de recuperação.' });
+    } catch (error) {
+      // Em caso de erro no envio, ainda retorna sucesso ao usuário
+      console.error('Forgot password error:', error);
+      res.json({ message: 'Se o email existir em nossa base, enviaremos um link de recuperação.' });
+    }
+  }
+
+  static async resetPassword(req, res, next) {
+    try {
+      const { token, password } = req.body;
+      if (!token || !password) {
+        return res.status(400).json({ error: 'Token e nova senha são obrigatórios' });
+      }
+      await AuthService.resetPassword(token, password);
+      res.json({ message: 'Senha redefinida com sucesso!' });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default AuthController;

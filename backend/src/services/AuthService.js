@@ -1,5 +1,6 @@
 import User from '../models/User.js';
 import Barber from '../models/Barber.js';
+import crypto from 'crypto';
 import { hashPassword, comparePassword, generateJWT, validateEmail, createValidationError, createNotFoundError } from '../middlewares/validators.js';
 
 export class AuthService {
@@ -194,6 +195,68 @@ export class AuthService {
         trialExpiresAt: trialExpires.toISOString(),
       },
     };
+  }
+
+  static async forgotPassword(email) {
+    const user = await User.findByEmail(email);
+    if (!user) return; // não revelar se existe
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 min
+    await User.setResetToken(user.id, token, expiresAt);
+
+    // Enviar email via SendGrid
+    const sgMail = (await import('@sendgrid/mail')).default;
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+    const link = `https://filalivre.app.br/resetar-senha?token=${token}`;
+    await sgMail.send({
+      to: email,
+      from: 'no-reply@filalivre.app.br',
+      subject: 'Recuperação de senha - FilaLivre',
+      html: `
+        <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+          <div style="background:#0f172a;padding:32px;text-align:center;">
+            <h1 style="color:#ffffff;margin:0;font-size:28px;letter-spacing:-0.5px;">FilaLivre</h1>
+            <p style="color:#94a3b8;margin:8px 0 0;font-size:14px;">Sistema inteligente de fila de atendimento</p>
+          </div>
+          <div style="padding:32px;">
+            <h2 style="color:#1e293b;font-size:20px;margin:0 0 16px;">Redefinição de senha</h2>
+            <p style="color:#475569;font-size:15px;line-height:1.6;margin:0 0 24px;">
+              Recebemos uma solicitação para redefinir sua senha. Clique no botão abaixo para criar uma nova senha:
+            </p>
+            <div style="text-align:center;margin:32px 0;">
+              <a href="${link}" style="display:inline-block;padding:14px 32px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;">
+                Redefinir minha senha
+              </a>
+            </div>
+            <p style="color:#94a3b8;font-size:13px;line-height:1.5;margin:24px 0 0;">
+              Este link expira em <strong>15 minutos</strong>. Se você não solicitou essa alteração, ignore este e-mail.
+            </p>
+          </div>
+          <div style="background:#f8fafc;padding:20px 32px;border-top:1px solid #e5e7eb;text-align:center;">
+            <p style="color:#94a3b8;font-size:12px;margin:0;">FilaLivre &copy; ${new Date().getFullYear()} &bull; Sistema de gestão de filas</p>
+          </div>
+        </div>
+      `,
+    });
+  }
+
+  static async resetPassword(token, newPassword) {
+    if (!token || !newPassword) {
+      throw createValidationError('Token e nova senha são obrigatórios');
+    }
+    if (newPassword.length < 6) {
+      throw createValidationError('A senha deve ter no mínimo 6 caracteres');
+    }
+
+    const user = await User.findByResetToken(token);
+    if (!user) {
+      throw createValidationError('Token inválido ou expirado');
+    }
+
+    const password_hash = await hashPassword(newPassword);
+    await User.updatePassword(user.id, password_hash);
   }
 }
 
