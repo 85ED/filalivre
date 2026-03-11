@@ -91,9 +91,13 @@ export class BarbershopService {
   }
 
   static async getPlatformSetting(settingKey, defaultValue = null) {
-    const Setting = (await import('../models/Setting.js')).default;
-    const setting = await Setting.findByKey(settingKey);
-    return setting ? setting.value : defaultValue;
+    try {
+      const Setting = (await import('../models/Setting.js')).default;
+      const setting = await Setting.findByKey(settingKey);
+      return setting ? setting.setting_value : defaultValue;
+    } catch {
+      return defaultValue;
+    }
   }
 
   static async deleteBarbershop(id) {

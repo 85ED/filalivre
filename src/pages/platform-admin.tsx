@@ -78,18 +78,22 @@ export function PlatformAdminPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [shopData, statsData, priceData] = await Promise.all([
+      const [shopData, statsData] = await Promise.all([
         api.get<{ barbershops: Barbershop[] }>('/barbershops'),
         api.get<PlatformStats>('/barbershops/platform/stats'),
-        api.get<{ priceCents: number }>('/barbershops/public-price'),
       ]);
       setBarbershops(shopData.barbershops);
       setStats(statsData);
-      setPublicPrice((priceData.priceCents / 100).toFixed(2));
     } catch (err) {
       console.error('Failed to fetch data:', err);
     } finally {
       setLoading(false);
+    }
+    try {
+      const priceData = await api.get<{ priceCents: number }>('/barbershops/public-price');
+      setPublicPrice((priceData.priceCents / 100).toFixed(2));
+    } catch {
+      // keep default
     }
   }, []);
 
