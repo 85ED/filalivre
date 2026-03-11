@@ -94,6 +94,10 @@ export function AdminPage() {
   }, [barbershop]);
 
   const handleSaveImageUrl = async () => {
+    if (!barbershopId) {
+      alert('Erro: ID do estabelecimento não encontrado. Faça login novamente.');
+      return;
+    }
     setImageUrlSaving(true);
     try {
       await api.patch(`/barbershops/${barbershopId}`, { image_url: imageUrl.trim() || null });
@@ -102,6 +106,7 @@ export function AdminPage() {
       refetchStatus();
     } catch (err) {
       console.error('Failed to save image URL:', err);
+      alert('Erro ao salvar imagem. Tente novamente.');
     } finally {
       setImageUrlSaving(false);
     }

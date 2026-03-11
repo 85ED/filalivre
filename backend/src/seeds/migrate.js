@@ -270,6 +270,58 @@ export async function runMigrations() {
       ],
     });
 
+    // Migration 011: platform_settings table
+    migrations.push({
+      name: '011_platform_settings',
+      queries: [
+        async (conn) => {
+          await conn.query(`
+            CREATE TABLE IF NOT EXISTS platform_settings (
+              setting_key VARCHAR(100) PRIMARY KEY,
+              setting_value TEXT,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            )
+          `);
+        },
+        async (conn) => {
+          await conn.query(`
+            INSERT INTO platform_settings (setting_key, setting_value)
+            VALUES ('public_seat_price_cents', '3500')
+            ON DUPLICATE KEY UPDATE setting_value = setting_value
+          `);
+        },
+      ],
+    });
+
+    // Migration 012: password reset columns on users
+    migrations.push({
+      name: '012_password_reset',
+      queries: [
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM users LIKE 'reset_token'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE users ADD COLUMN reset_token VARCHAR(64) NULL`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM users LIKE 'reset_token_expires_at'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE users ADD COLUMN reset_token_expires_at TIMESTAMP NULL`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+        async (conn) => {
+          try {
+            await conn.query(`CREATE INDEX idx_users_reset_token ON users(reset_token)`);
+          } catch (e) { /* ignore - index may already exist */ }
+        },
+      ],
+    });
+
     for (const migration of migrations) {
       const [applied] = await pool.query('SELECT * FROM _migrations WHERE name = ?', [migration.name]);
       if (applied.length > 0) continue;
