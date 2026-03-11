@@ -10,7 +10,7 @@ import { FilaLivreLogo } from '@/components/ui/filalivre-logo';
 import { useAuth } from '@/hooks';
 
 export function LandingPage() {
-  const title = 'Fila Inteligente de Atendimento';
+  const title = 'Sistema de Gestão de Filas para Atendimento Presencial';
   const words = title.split(' ');
   const [showSignup, setShowSignup] = useState(false);
   const [signupData, setSignupData] = useState({
@@ -29,7 +29,7 @@ export function LandingPage() {
   const [priceLoading, setPriceLoading] = useState(true);
 
   useEffect(() => {
-    document.title = 'FilaLivre — Sistema de fila inteligente';
+    document.title = 'FilaLivre — Sistema de Gestão de Filas | Fila Virtual pelo Celular';
     // Fetch public price from backend
     fetch('/api/barbershops/public-price')
       .then(res => res.json())
@@ -66,6 +66,9 @@ export function LandingPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Criar conta grátis"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
@@ -164,18 +167,20 @@ export function LandingPage() {
 
         <div className="relative z-10">
           {/* Navbar */}
-          <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FilaLivreLogo className="w-10 h-10" />
-              <span className="text-xl font-bold text-neutral-900">FilaLivre</span>
-            </div>
-            <Link to="/login">
-              <Button variant="outline" size="sm" className="gap-2">
-                <LogIn className="w-4 h-4" />
-                Login
-              </Button>
-            </Link>
-          </div>
+          <header>
+            <nav className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between" aria-label="Navegação principal">
+              <div className="flex items-center gap-2">
+                <FilaLivreLogo className="w-10 h-10" />
+                <span className="text-xl font-bold text-neutral-900">FilaLivre</span>
+              </div>
+              <Link to="/login">
+                <Button variant="outline" size="sm" className="gap-2" aria-label="Fazer login">
+                  <LogIn className="w-4 h-4" />
+                  Login
+                </Button>
+              </Link>
+            </nav>
+          </header>
 
           <div className="max-w-7xl mx-auto px-4 py-20 sm:py-32">
             <motion.div
@@ -184,7 +189,7 @@ export function LandingPage() {
               transition={{ duration: 2 }}
               className="text-center space-y-8"
             >
-              <motion.h1 className="text-5xl sm:text-7xl md:text-8xl font-bold mb-8 tracking-tighter">
+              <motion.h1 className="text-4xl sm:text-6xl md:text-7xl font-bold mb-8 tracking-tighter">
                 {words.map((word, wordIndex) => (
                   <span key={wordIndex} className="inline-block mr-4 last:mr-0">
                     {word.split('').map((letter, letterIndex) => (
@@ -213,7 +218,7 @@ export function LandingPage() {
                 transition={{ delay: 0.5 }}
                 className="text-xl sm:text-2xl text-neutral-600 max-w-3xl mx-auto leading-relaxed"
               >
-                Seus clientes acompanham a fila pelo celular enquanto você trabalha.
+                Seus clientes entram na fila pelo celular, acompanham a posição em tempo real e recebem aviso quando a vez chega. Funciona para qualquer tipo de estabelecimento.
               </motion.p>
 
               <motion.div
@@ -226,9 +231,10 @@ export function LandingPage() {
                   size="lg"
                   onClick={() => setShowSignup(true)}
                   className="group relative bg-neutral-900 hover:bg-neutral-800 text-white border-0 shadow-lg px-8 py-6 text-lg rounded-xl"
+                  aria-label="Experimentar FilaLivre grátis por 7 dias"
                 >
                   Experimentar grátis
-                  <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" aria-hidden="true" />
                 </Button>
 
                 <Link to="/login">
@@ -247,7 +253,7 @@ export function LandingPage() {
         </div>
       </div>
 
-      <section className="py-24 bg-neutral-50">
+      <main aria-labelledby="como-funciona">
         <div className="max-w-7xl mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -255,10 +261,10 @@ export function LandingPage() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-4xl sm:text-5xl font-bold text-neutral-900 mb-4">
-              Como funciona
+            <h2 id="como-funciona" className="text-4xl sm:text-5xl font-bold text-neutral-900 mb-4">
+              Como funciona a fila virtual
             </h2>
-            <p className="text-xl text-neutral-600">Simples, rápido e eficiente</p>
+            <p className="text-xl text-neutral-600">Três passos para eliminar filas de espera no seu estabelecimento</p>
           </motion.div>
 
           <div className="grid md:grid-cols-3 gap-8">
@@ -266,19 +272,19 @@ export function LandingPage() {
               {
                 icon: Smartphone,
                 title: 'Cliente entra na fila pelo celular',
-                description: 'Acesso rápido e simples pelo navegador, sem necessidade de instalação',
+                description: 'Sem instalar aplicativo. O cliente acessa o link do seu estabelecimento e entra na fila em segundos.',
                 color: 'from-blue-500 to-cyan-500',
               },
               {
                 icon: Eye,
-                title: 'Acompanha posição em tempo real',
-                description: 'Visualização clara da posição e tempo estimado de espera',
+                title: 'Acompanha a posição em tempo real',
+                description: 'O cliente vê exatamente onde está na fila e o tempo estimado de espera, na tela do celular.',
                 color: 'from-purple-500 to-pink-500',
               },
               {
                 icon: Bell,
-                title: 'É chamado quando chega sua vez',
-                description: 'Notificação automática para não perder o momento do atendimento',
+                title: 'Recebe alerta quando chega a vez',
+                description: 'Notificação automática por WhatsApp ou na tela. O cliente não precisa ficar esperando no local.',
                 color: 'from-emerald-500 to-teal-500',
               },
             ].map((step, index) => (
@@ -289,6 +295,7 @@ export function LandingPage() {
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.2 }}
                 className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow"
+                role="article"
               >
                 <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${step.color} flex items-center justify-center mb-6`}>
                   <step.icon className="w-8 h-8 text-white" />
@@ -306,7 +313,7 @@ export function LandingPage() {
       </section>
 
       {/* Preço */}
-      <section className="py-24 bg-white">
+      <section className="py-24 bg-white" aria-labelledby="preco">
         <div className="max-w-7xl mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -314,10 +321,10 @@ export function LandingPage() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-4xl sm:text-5xl font-bold text-neutral-900 mb-4">
-              Preço simples e justo
+            <h2 id="preco" className="text-4xl sm:text-5xl font-bold text-neutral-900 mb-4">
+              Preço simples e transparente
             </h2>
-            <p className="text-xl text-neutral-600">Pague apenas pelo que usa. Sem planos confusos.</p>
+            <p className="text-xl text-neutral-600">Pague apenas pelo que usa. Sem planos confusos, sem surpresa na fatura.</p>
           </motion.div>
 
           <motion.div
@@ -342,12 +349,12 @@ export function LandingPage() {
                 {[
                   'Fila digital em tempo real',
                   'Painel administrativo completo',
-                  'Relatórios e estatísticas',
+                  'Relatórios e estatísticas de atendimento',
                   'Alertas automáticos por WhatsApp',
-                  'Link público personalizado',
-                  'Monitor TV para o estabelecimento',
-                  'Cobrança proporcional ao crescimento',
-                  'Sem taxa de setup, sem contrato',
+                  'Link público exclusivo do seu estabelecimento',
+                  'Monitor TV para exibir a fila no local',
+                  'Cobrança proporcional — cresce com você',
+                  'Sem taxa de setup, sem contrato de fidelidade',
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-3">
                     <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0" />
@@ -359,18 +366,19 @@ export function LandingPage() {
                 size="lg"
                 onClick={() => setShowSignup(true)}
                 className="w-full bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-lg h-14 font-semibold"
+                aria-label="Criar conta e experimentar grátis por 7 dias"
               >
-                Experimentar grátis
-                <ArrowRight className="ml-2 w-5 h-5" />
+                Criar minha conta grátis
+                <ArrowRight className="ml-2 w-5 h-5" aria-hidden="true" />
               </Button>
-              <p className="text-center text-sm text-neutral-400 mt-3">Sem cartão de crédito para começar</p>
+              <p className="text-center text-sm text-neutral-400 mt-3">Sem cartão de crédito • Cancele quando quiser</p>
             </div>
           </motion.div>
         </div>
       </section>
 
       {/* Benefícios */}
-      <section className="py-24 bg-neutral-50">
+      <section className="py-24 bg-neutral-50" aria-labelledby="beneficios">
         <div className="max-w-7xl mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -378,24 +386,24 @@ export function LandingPage() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-4xl sm:text-5xl font-bold text-neutral-900 mb-4">
-              Benefícios
+            <h2 id="beneficios" className="text-4xl sm:text-5xl font-bold text-neutral-900 mb-4">
+              Por que usar o FilaLivre?
             </h2>
           </motion.div>
 
           <div className="grid md:grid-cols-3 gap-8">
             {[
               {
-                title: 'Acabe com a confusão de fila',
-                description: 'Elimine filas físicas e organize o fluxo de clientes automaticamente',
+                title: 'Elimine filas físicas de vez',
+                description: 'Seus clientes não precisam mais esperar em pé. A fila é digital e organizada automaticamente.',
               },
               {
-                title: 'Clientes acompanham a vez pelo celular',
-                description: 'Liberdade para o cliente fazer outras atividades enquanto espera',
+                title: 'Clientes livres enquanto esperam',
+                description: 'Com a fila virtual no celular, seu cliente pode tomar um café, passear ou resolver outras coisas enquanto aguarda.',
               },
               {
-                title: 'Mais organização no atendimento',
-                description: 'Gerencie melhor seu tempo e ofereça uma experiência premium',
+                title: 'Atendimento mais profissional',
+                description: 'Gerencie melhor o fluxo de atendimento e transforme a experiência do seu cliente em algo organizado e moderno.',
               },
             ].map((benefit, index) => (
               <motion.div
@@ -422,7 +430,7 @@ export function LandingPage() {
       </section>
 
       {/* Sobre a Plataforma */}
-      <section className="py-24 bg-white">
+      <section className="py-24 bg-white" aria-labelledby="plataforma">
         <div className="max-w-7xl mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -430,10 +438,10 @@ export function LandingPage() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-4xl sm:text-5xl font-bold text-neutral-900 mb-4">
-              A plataforma
+            <h2 id="plataforma" className="text-4xl sm:text-5xl font-bold text-neutral-900 mb-4">
+              Tudo que seu estabelecimento precisa
             </h2>
-            <p className="text-xl text-neutral-600">Tudo que você precisa para gerenciar filas de atendimento</p>
+            <p className="text-xl text-neutral-600">Controle de fila completo: do celular do cliente ao painel do gestor</p>
           </motion.div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -498,7 +506,7 @@ export function LandingPage() {
       </section>
 
       {/* FAQ */}
-      <section className="py-24 bg-neutral-50">
+      <section className="py-24 bg-neutral-50" aria-labelledby="faq">
         <div className="max-w-3xl mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -506,7 +514,7 @@ export function LandingPage() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-4xl sm:text-5xl font-bold text-neutral-900 mb-4">
+            <h2 id="faq" className="text-4xl sm:text-5xl font-bold text-neutral-900 mb-4">
               Perguntas frequentes
             </h2>
           </motion.div>
@@ -531,7 +539,7 @@ export function LandingPage() {
               },
               {
                 q: 'Funciona para qualquer tipo de estabelecimento?',
-                a: 'Sim! Barbearias, salões de beleza, clínicas, consultórios, laboratórios — qualquer lugar que trabalhe com fila de atendimento presencial.',
+                a: 'Sim! Barbearias, salões de beleza, clínicas, consultórios, restaurantes, cartórios, laboratórios, serviços públicos — qualquer lugar que trabalhe com fila de atendimento presencial.',
               },
               {
                 q: 'Como funciona o alerta por WhatsApp?',
@@ -557,9 +565,11 @@ export function LandingPage() {
                 <button
                   onClick={() => setOpenFaq(openFaq === index ? null : index)}
                   className="w-full flex items-center justify-between p-5 text-left"
+                  aria-expanded={openFaq === index}
+                  aria-controls={`faq-answer-${index}`}
                 >
                   <span className="font-semibold text-neutral-900 pr-4">{item.q}</span>
-                  <ChevronDown className={`w-5 h-5 text-neutral-400 flex-shrink-0 transition-transform ${openFaq === index ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-5 h-5 text-neutral-400 flex-shrink-0 transition-transform ${openFaq === index ? 'rotate-180' : ''}`} aria-hidden="true" />
                 </button>
                 <AnimatePresence>
                   {openFaq === index && (
@@ -570,7 +580,7 @@ export function LandingPage() {
                       transition={{ duration: 0.2 }}
                       className="overflow-hidden"
                     >
-                      <p className="px-5 pb-5 text-neutral-600 leading-relaxed">{item.a}</p>
+                      <p id={`faq-answer-${index}`} className="px-5 pb-5 text-neutral-600 leading-relaxed">{item.a}</p>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -611,29 +621,33 @@ export function LandingPage() {
       </section>
 
       {/* CTA final */}
-      <section className="py-20 bg-neutral-900">
+      <section className="py-20 bg-neutral-900" aria-labelledby="cta-final">
         <div className="max-w-3xl mx-auto px-4 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-            Pronto para organizar seu atendimento?
+          <h2 id="cta-final" className="text-3xl sm:text-4xl font-bold text-white mb-4">
+            Pronto para acabar com as filas de espera?
           </h2>
           <p className="text-neutral-400 text-lg mb-8">
-            Comece agora com 7 dias grátis. Leva menos de 2 minutos.
+            Crie sua conta em menos de 2 minutos e teste grátis por 7 dias. Sem cartão, sem compromisso.
           </p>
           <Button
             size="lg"
             onClick={() => setShowSignup(true)}
             className="bg-white hover:bg-neutral-100 text-neutral-900 rounded-xl text-lg h-14 px-10 font-semibold"
+            aria-label="Criar conta grátis no FilaLivre"
           >
             Criar minha conta grátis
-            <ArrowRight className="ml-2 w-5 h-5" />
+            <ArrowRight className="ml-2 w-5 h-5" aria-hidden="true" />
           </Button>
+          <p className="text-neutral-500 text-sm mt-4">Mais de 7 dias não é suficiente? Fale conosco.</p>
         </div>
       </section>
 
-      <footer className="py-8 bg-neutral-900 text-white">
+      </main>
+
+      <footer className="py-8 bg-neutral-900 text-white" role="contentinfo">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-lg mb-2">FilaLivre &copy;</p>
-          <p className="text-neutral-400">Sistema inteligente de fila de atendimento</p>
+          <p className="text-lg mb-2">FilaLivre &copy; {new Date().getFullYear()}</p>
+          <p className="text-neutral-400">Sistema de gestão de filas para atendimento presencial</p>
         </div>
       </footer>
     </div>
