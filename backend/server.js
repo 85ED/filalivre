@@ -55,43 +55,102 @@ app.get('/api/subscription/seat-info', authMiddleware, roleMiddleware(['admin', 
 
 // WhatsApp — proxy requests to filalivre-whatsapp microservice
 const WHATSAPP_SERVICE_URL = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3003';
-app.use('/api/whatsapp', async (req, res) => {
-  try {
-    // Strip /api/whatsapp prefix from the path (use baseUrl which contains the prefix)
-    // req.originalUrl might have query params, so we subtract the prefix more carefully
-    // Example: /api/whatsapp/status/1 → /status/1
-    const relativePath = req.originalUrl.replace(/^\/api\/whatsapp/, '') || '/';
-    const targetUrl = `${WHATSAPP_SERVICE_URL}${relativePath}`;
-    console.log(`[WhatsApp Proxy] ${req.method} ${req.path} → ${targetUrl}`);
-    const fetchOptions = { 
-      method: req.method, 
-      headers: { 'Content-Type': 'application/json' },
-      timeout: 15000 // 15s timeout (increased from 10s)
-    };
-    if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body) {
-      fetchOptions.body = JSON.stringify(req.body);
+const WHATSAPP_FALLBACK_URLS = [
+  WHATSAPP_SERVICE_URL,
+  'http://filalivre-whatsapp.railway.internal:3003',
+  'http://filalivre-whatsapp:3003',
+];
+
+// Diagnostic endpoint to test WhatsApp connectivity
+app.get('/api/whatsapp-diagnostic', async (req, res) => {
+  console.log('[Diagnostic] Testing WhatsApp connectivity...');
+  const results = [];
+  
+  for (const url of WHATSAPP_FALLBACK_URLS) {
+    try {
+      const testUrl = `${url}/health`;
+      console.log(`[Diagnostic] Tentando: ${testUrl}`);
+      const response = await fetch(testUrl, { timeout: 3000 });
+      const data = await response.json();
+      results.push({
+        url,
+        status: 'SUCCESS',
+        httpStatus: response.status,
+        response: data
+      });
+      console.log(`[Diagnostic] ✓ Sucesso: ${url}`);
+      break; // Stop on first success
+    } catch (err) {
+      results.push({
+        url,
+        status: 'FAILED',
+        error: err.message,
+        errorCode: err.code,
+        errorName: err.name
+      });
+      console.error(`[Diagnostic] ✗ Falhou ${url}: ${err.code || err.name} - ${err.message}`);
     }
-    console.log(`[WhatsApp Proxy] [DEBUG] Fazendo fetch para: ${targetUrl}`);
-    const response = await fetch(targetUrl, fetchOptions);
-    console.log(`[WhatsApp Proxy] [DEBUG] Resposta recebida: ${response.status}`);
-    const data = await response.json();
-    res.status(response.status).json(data);
-  } catch (err) {
-    const errorType = err.code || err.name || 'UNKNOWN';
-    const errorMsg = err.message || 'Unknown error';
-    console.error(`[WhatsApp Proxy] [ERROR] Tipo: ${errorType}`);
-    console.error(`[WhatsApp Proxy] [ERROR] Mensagem: ${errorMsg}`);
-    console.error(`[WhatsApp Proxy] [ERROR] Stack:`, err.stack);
-    console.error(`[WhatsApp Proxy] [ERROR] Tentando conectar a: ${WHATSAPP_SERVICE_URL}`);
-    res.status(503).json({ 
-      error: 'Serviço WhatsApp indisponível',
-      details: process.env.NODE_ENV === 'development' ? {
-        errorType,
-        errorMsg,
-        targetUrl: WHATSAPP_SERVICE_URL
-      } : undefined
-    });
   }
+  
+  res.json({
+    primary_url: WHATSAPP_SERVICE_URL,
+    fallback_urls: WHATSAPP_FALLBACK_URLS,
+    test_results: results,
+    timestamp: new Date()
+  });
+});
+
+app.use('/api/whatsapp', async (req, res) => {
+  const relativePath = req.originalUrl.replace(/^\/api\/whatsapp/, '') || '/';
+  
+  let lastError = null;
+  let successUrl = null;
+  
+  // Try each URL in sequence
+  for (const baseUrl of WHATSAPP_FALLBACK_URLS) {
+    try {
+      const targetUrl = `${baseUrl}${relativePath}`;
+      console.log(`[WhatsApp Proxy] [${req.method}] Tentando: ${targetUrl}`);
+      
+      const fetchOptions = { 
+        method: req.method, 
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 10000
+      };
+      
+      if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body) {
+        fetchOptions.body = JSON.stringify(req.body);
+      }
+      
+      const response = await fetch(targetUrl, fetchOptions);
+      const data = await response.json();
+      
+      successUrl = baseUrl;
+      console.log(`[WhatsApp Proxy] ✓ Sucesso com ${baseUrl}: HTTP ${response.status}`);
+      return res.status(response.status).json(data);
+      
+    } catch (err) {
+      lastError = {
+        url: baseUrl,
+        code: err.code,
+        name: err.name,
+        message: err.message
+      };
+      console.error(`[WhatsApp Proxy] ✗ Falhou ${baseUrl}: ${err.code || err.name} - ${err.message}`);
+      // Continue to next URL
+    }
+  }
+  
+  // All attempts failed
+  console.error('[WhatsApp Proxy] [CRITICAL] Todas as tentativas falharam para o WhatsApp Service');
+  res.status(503).json({ 
+    error: 'Serviço WhatsApp indisponível',
+    details: process.env.NODE_ENV === 'development' ? {
+      tried_urls: WHATSAPP_FALLBACK_URLS,
+      last_error: lastError,
+      env_url: WHATSAPP_SERVICE_URL
+    } : undefined
+  });
 });
 
 // Health check endpoint
