@@ -322,6 +322,18 @@ export async function runMigrations() {
       ],
     });
 
+    // Migration 013: increase image_url column size for longer URLs
+    migrations.push({
+      name: '013_increase_image_url_size',
+      queries: [
+        async (conn) => {
+          try {
+            await conn.query(`ALTER TABLE barbershops MODIFY COLUMN image_url VARCHAR(2000) NULL`);
+          } catch (e) { /* ignore */ }
+        },
+      ],
+    });
+
     for (const migration of migrations) {
       const [applied] = await pool.query('SELECT * FROM _migrations WHERE name = ?', [migration.name]);
       if (applied.length > 0) continue;
