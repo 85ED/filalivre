@@ -28,6 +28,9 @@ dist-ssr
 backend/tokens
 node_modules
 .env
+
+# Documentação local (referência interna, não sobe pro GitHub)
+docs/
 dist
 
 backend/tokens/
