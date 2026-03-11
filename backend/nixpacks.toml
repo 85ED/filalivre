@@ -1,0 +1,6 @@
+[phases.setup]
+nixPkgs = ['chromium', 'nss', 'freetype', 'fontconfig']
+
+[variables]
+PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = 'true'
+NIXPACKS_CHROMIUM_PATH = '/nix/var/nix/profiles/default/bin/chromium'

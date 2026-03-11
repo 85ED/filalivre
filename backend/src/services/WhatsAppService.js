@@ -1,9 +1,25 @@
 import wppconnect from '@wppconnect-team/wppconnect';
 import pool from '../config/database.js';
+import { existsSync } from 'fs';
 
 const sessions = new Map();
 // Armazena último QR gerado por sessão (acessível pelo controller)
 const qrCodes = new Map();
+
+// Detecta Chromium do sistema (Nix no Railway, ou fallback)
+function getChromiumPath() {
+  const candidates = [
+    process.env.NIXPACKS_CHROMIUM_PATH,
+    process.env.PUPPETEER_EXECUTABLE_PATH,
+    '/nix/var/nix/profiles/default/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+  ].filter(Boolean);
+  for (const p of candidates) {
+    if (existsSync(p)) return p;
+  }
+  return undefined; // Usa Chromium bundled do puppeteer
+}
 
 export async function startSession(sessionName) {
   // Se já existe sessão ativa, retorna ela
@@ -18,6 +34,11 @@ export async function startSession(sessionName) {
     // Timeout de 30s caso não gere QR (sessão já autenticada)
     setTimeout(() => resolve(null), 30000);
   });
+
+  const chromiumPath = getChromiumPath();
+  if (chromiumPath) {
+    console.log('[WhatsApp] Usando Chromium do sistema:', chromiumPath);
+  }
 
   const client = await wppconnect.create({
     session: sessionName,
@@ -35,6 +56,16 @@ export async function startSession(sessionName) {
     headless: true,
     useChrome: false,
     logQR: true,
+    ...(chromiumPath ? { browserPathExecutable: chromiumPath } : {}),
+    browserArgs: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process',
+    ],
   });
 
   sessions.set(sessionName, client);
