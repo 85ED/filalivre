@@ -11,8 +11,6 @@ import StripeWebhookController from './src/controllers/StripeWebhookController.j
 import { runMigrations } from './src/seeds/migrate.js';
 import { seedPlatformOwner } from './src/seeds/platformOwner.js';
 
-const WHATSAPP_ENABLED = process.env.WHATSAPP_ENABLED === 'true';
-
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -55,19 +53,23 @@ app.post('/api/subscription/checkout', authMiddleware, roleMiddleware(['admin', 
 app.post('/api/subscription/portal', authMiddleware, roleMiddleware(['admin', 'owner']), SubscriptionController.getPortalSession);
 app.get('/api/subscription/seat-info', authMiddleware, roleMiddleware(['admin', 'owner']), SubscriptionController.getSeatInfo);
 
-// WhatsApp routes and worker (requires Chrome/Puppeteer - disabled in minimal containers)
-if (WHATSAPP_ENABLED) {
-  const whatsappRoutes = (await import('./src/routes/whatsapp.js')).default;
-  const { checkQueueAlerts } = await import('./src/workers/QueueAlertWorker.js');
-  app.use('/api/whatsapp', whatsappRoutes);
-  setInterval(checkQueueAlerts, 5000);
-  console.log('[WhatsApp] Enabled');
-} else {
-  app.use('/api/whatsapp', (req, res) => {
-    res.status(503).json({ error: 'WhatsApp não está habilitado neste servidor' });
-  });
-  console.log('[WhatsApp] Disabled (set WHATSAPP_ENABLED=true to enable)');
-}
+// WhatsApp — proxy requests to filalivre-whatsapp microservice
+const WHATSAPP_SERVICE_URL = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3003';
+app.use('/api/whatsapp', async (req, res) => {
+  try {
+    const targetUrl = `${WHATSAPP_SERVICE_URL}${req.path}`;
+    const fetchOptions = { method: req.method, headers: { 'Content-Type': 'application/json' } };
+    if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body) {
+      fetchOptions.body = JSON.stringify(req.body);
+    }
+    const response = await fetch(targetUrl, fetchOptions);
+    const data = await response.json();
+    res.status(response.status).json(data);
+  } catch (err) {
+    console.error('[WhatsApp Proxy] Error:', err.message);
+    res.status(503).json({ error: 'Serviço WhatsApp indisponível' });
+  }
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
