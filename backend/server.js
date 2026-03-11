@@ -62,7 +62,7 @@ app.use('/api/whatsapp', async (req, res) => {
     const fetchOptions = { 
       method: req.method, 
       headers: { 'Content-Type': 'application/json' },
-      timeout: 10000 // 10s timeout
+      timeout: 15000 // 15s timeout (increased from 10s)
     };
     if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body) {
       fetchOptions.body = JSON.stringify(req.body);
@@ -73,11 +73,19 @@ app.use('/api/whatsapp', async (req, res) => {
     const data = await response.json();
     res.status(response.status).json(data);
   } catch (err) {
-    console.error('[WhatsApp Proxy] [ERROR] Erro ao conectar:', err.message);
-    console.error('[WhatsApp Proxy] [ERROR] Stack:', err.stack);
+    const errorType = err.code || err.name || 'UNKNOWN';
+    const errorMsg = err.message || 'Unknown error';
+    console.error(`[WhatsApp Proxy] [ERROR] Tipo: ${errorType}`);
+    console.error(`[WhatsApp Proxy] [ERROR] Mensagem: ${errorMsg}`);
+    console.error(`[WhatsApp Proxy] [ERROR] Stack:`, err.stack);
+    console.error(`[WhatsApp Proxy] [ERROR] Tentando conectar a: ${WHATSAPP_SERVICE_URL}`);
     res.status(503).json({ 
       error: 'Serviço WhatsApp indisponível',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+      details: process.env.NODE_ENV === 'development' ? {
+        errorType,
+        errorMsg,
+        targetUrl: WHATSAPP_SERVICE_URL
+      } : undefined
     });
   }
 });
