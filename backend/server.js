@@ -57,7 +57,11 @@ app.get('/api/subscription/seat-info', authMiddleware, roleMiddleware(['admin', 
 const WHATSAPP_SERVICE_URL = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3003';
 app.use('/api/whatsapp', async (req, res) => {
   try {
-    const targetUrl = `${WHATSAPP_SERVICE_URL}${req.path}`;
+    // Strip /api/whatsapp prefix from the path (use baseUrl which contains the prefix)
+    // req.originalUrl might have query params, so we subtract the prefix more carefully
+    // Example: /api/whatsapp/status/1 → /status/1
+    const relativePath = req.originalUrl.replace(/^\/api\/whatsapp/, '') || '/';
+    const targetUrl = `${WHATSAPP_SERVICE_URL}${relativePath}`;
     console.log(`[WhatsApp Proxy] ${req.method} ${req.path} → ${targetUrl}`);
     const fetchOptions = { 
       method: req.method, 
