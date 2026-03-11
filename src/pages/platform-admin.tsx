@@ -155,13 +155,17 @@ export function PlatformAdminPage() {
       };
       if (editingId) {
         await api.patch(`/barbershops/${editingId}`, payload);
+        alert('Estabelecimento atualizado com sucesso!');
       } else {
         await api.post('/barbershops', payload);
+        alert('Estabelecimento criado com sucesso!');
       }
       setShowForm(false);
       await fetchData();
     } catch (err: any) {
-      setFormError(err?.message || 'Erro ao salvar');
+      const errorMsg = err?.message || 'Erro ao salvar estabelecimento';
+      setFormError(errorMsg);
+      alert(errorMsg);
     } finally {
       setSaving(false);
     }
