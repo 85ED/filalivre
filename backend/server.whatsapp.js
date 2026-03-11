@@ -12,7 +12,7 @@ import {
 } from './src/services/WhatsAppService.js';
 
 const app = express();
-const PORT = process.env.PORT || 3003;
+const PORT = process.env.WHATSAPP_PORT || 3003;
 
 app.use(express.json());
 
