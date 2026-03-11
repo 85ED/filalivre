@@ -65,10 +65,38 @@ const WHATSAPP_FALLBACK_URLS = [
 app.get('/api/whatsapp-diagnostic', async (req, res) => {
   console.log('[Diagnostic] Testing WhatsApp connectivity on multiple endpoints...');
   const results = {
+    ping: [],
     health: [],
     ready: []
   };
   
+  // Test /ping endpoint (simplest)
+  for (const url of WHATSAPP_FALLBACK_URLS) {
+    try {
+      const testUrl = `${url}/ping`;
+      console.log(`[Diagnostic] Testing /ping: ${testUrl}`);
+      const response = await fetch(testUrl, { timeout: 3000 });
+      const data = await response.text();
+      results.ping.push({
+        url,
+        status: 'SUCCESS',
+        httpStatus: response.status,
+        response: data
+      });
+      console.log(`[Diagnostic] ✓ /ping success: ${url}`);
+      break;
+    } catch (err) {
+      results.ping.push({
+        url,
+        status: 'FAILED',
+        error: err.message,
+        errorCode: err.code,
+        errorName: err.name
+      });
+      console.error(`[Diagnostic] ✗ /ping failed ${url}: ${err.code || err.name} - ${err.message}`);
+    }
+  }
+
   // Test /health endpoint
   for (const url of WHATSAPP_FALLBACK_URLS) {
     try {
@@ -128,6 +156,7 @@ app.get('/api/whatsapp-diagnostic', async (req, res) => {
     primary_url: WHATSAPP_SERVICE_URL,
     fallback_urls: WHATSAPP_FALLBACK_URLS,
     test_results: {
+      ping_endpoint: results.ping,
       health_endpoint: results.health,
       ready_endpoint: results.ready
     }

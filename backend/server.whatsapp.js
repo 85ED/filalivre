@@ -16,6 +16,11 @@ const PORT = process.env.WHATSAPP_PORT || 3003;
 
 app.use(express.json());
 
+// Ultra-simple ping (no dependencies, pure response)
+app.get('/ping', (req, res) => {
+  res.send('pong');
+});
+
 app.use((req, res, next) => {
   console.log(`[WhatsApp] ${req.method} ${req.path}`);
   next();
