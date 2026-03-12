@@ -187,11 +187,14 @@ app.use('/api/whatsapp', async (req, res) => {
       }
       
       const response = await fetch(targetUrl, fetchOptions);
-      const data = await response.json();
+      const contentType = response.headers.get('content-type') || '';
+      const data = contentType.includes('application/json')
+        ? await response.json()
+        : await response.text();
       
       successUrl = baseUrl;
       console.log(`[WhatsApp Proxy] ✓ Sucesso com ${baseUrl}: HTTP ${response.status}`);
-      return res.status(response.status).json(data);
+      return res.status(response.status).json({ data });
       
     } catch (err) {
       lastError = {
