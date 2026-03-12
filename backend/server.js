@@ -15,26 +15,18 @@ import { seedPlatformOwner } from './src/seeds/platformOwner.js';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// CORS configuration - simple and direct
-const allowedOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
-  : [];
-
+// CORS configuration - respond with the requesting origin
+// The browser sends OPTIONS preflight request, we respond with Access-Control-Allow-Origin
 app.use(cors({
-  origin: allowedOrigins.length ? allowedOrigins : true,
+  origin: function(origin, callback) {
+    // Always allow the requesting origin (frontend will send its domain)
+    // This guarantees the browser gets the required CORS header
+    callback(null, origin || '*');
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
-// responder qualquer preflight imediatamente
-app.options(/.*/, (req, res) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  return res.sendStatus(204);
-});
 
 // Stripe webhook needs raw body — must be before express.json()
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), StripeWebhookController.handle);
