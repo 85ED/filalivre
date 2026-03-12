@@ -69,7 +69,6 @@ export async function startSession(sessionName) {
       }
     },
     headless: true,
-    useChrome: false,
     logQR: true,
     // CRÍTICO: Sempre passar browserPathExecutable, não deixar undefined
     browserPathExecutable: chromiumPath,
@@ -80,7 +79,6 @@ export async function startSession(sessionName) {
       '--disable-gpu',
       '--no-first-run',
       '--no-zygote',
-      '--single-process',
     ],
   });
 
