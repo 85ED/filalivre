@@ -21,22 +21,25 @@ const allowedOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
   : [];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // Allow requests without origin (webhooks, curl, health checks)
-      if (!origin) return callback(null, true);
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin) {
+      return callback(null, true);
+    }
 
-      // Allow only origins in the whitelist
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
 
-      return callback(new Error('CORS not allowed'));
-    },
-    credentials: true
-  })
-);
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Stripe webhook needs raw body — must be before express.json()
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), StripeWebhookController.handle);
