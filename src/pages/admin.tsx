@@ -541,8 +541,9 @@ export function AdminPage() {
                 })}
               </div>
 
-              {/* WhatsApp Usage Card */}
+              {/* WhatsApp Usage + Profissionais (lado a lado no desktop) */}
               <div className="grid lg:grid-cols-2 gap-6">
+                {/* WhatsApp Card - esquerda */}
                 <motion.div
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -550,23 +551,27 @@ export function AdminPage() {
                 >
                   <WhatsAppUsageCard onBuyCreditsClick={() => setBuyCreditsModalOpen(true)} />
                 </motion.div>
-              </div>
 
-              {/* Barbers → Profissionais */}
-              <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-neutral-900">Profissionais</h2>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-neutral-500">{barbers.length} cadastrados</span>
-                    <button
-                      onClick={() => setView('professionals')}
-                      className="text-xs text-blue-600 hover:underline font-semibold"
-                    >
-                      Gerenciar
-                    </button>
+                {/* Profissionais - direita com scroll automático */}
+                <motion.div
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.25 }}
+                  className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm flex flex-col max-h-96"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-neutral-900">Profissionais</h2>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-sm text-neutral-500">{barbers.length} cadastrados</span>
+                      <button
+                        onClick={() => setView('professionals')}
+                        className="text-xs text-blue-600 hover:underline font-semibold whitespace-nowrap"
+                      >
+                        Gerenciar
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-2">
+                  <div className="space-y-2 overflow-y-auto flex-1 pr-2">
                   {barbers.map((barber) => (
                     <div
                       key={barber.id}
@@ -599,7 +604,8 @@ export function AdminPage() {
                       </div>
                     </div>
                   ))}
-                </div>
+                  </div>
+                </motion.div>
               </div>
 
               {/* Slug / Link público */}

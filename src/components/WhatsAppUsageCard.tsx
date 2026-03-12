@@ -18,7 +18,7 @@ export function WhatsAppUsageCard({ onBuyCreditsClick }: WhatsAppUsageCardProps)
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5" />
-            WhatsApp Notifications
+            Notificações WhatsApp
           </CardTitle>
           <CardDescription>Carregando...</CardDescription>
         </CardHeader>
@@ -32,7 +32,7 @@ export function WhatsAppUsageCard({ onBuyCreditsClick }: WhatsAppUsageCardProps)
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-red-700">
             <AlertCircle className="w-5 h-5" />
-            WhatsApp Notifications
+            Notificações WhatsApp
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -50,7 +50,7 @@ export function WhatsAppUsageCard({ onBuyCreditsClick }: WhatsAppUsageCardProps)
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5" />
-            <CardTitle>WhatsApp Notifications</CardTitle>
+            <CardTitle>Notificações WhatsApp</CardTitle>
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold">{stats.percentage}%</p>

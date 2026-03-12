@@ -1,13 +1,124 @@
 import {
-  startSession,
-  isSessionActive,
-  getLastQR,
-  disconnectSession,
   registerSession,
   getSessionFromDB,
 } from '../services/WhatsAppService.js';
 import WhatsAppUsageService from '../services/WhatsAppUsageService.js';
 import StripeService from '../services/StripeService.js';
+import pool from '../config/database.js';
+
+// WhatsApp microservice URL (agora em container Docker)
+const WHATSAPP_SERVICE_URL = 
+  process.env.WHATSAPP_SERVICE_URL || 'http://filalivre-whatsapp:3003';
+
+const WHATSAPP_FALLBACK_URLS = [
+  WHATSAPP_SERVICE_URL,
+  'http://filalivre-whatsapp.railway.internal:3003',
+  'http://filalivre-whatsapp:3003',
+];
+
+/**
+ * Envia email de alerta para o proprietário da barbearia
+ * Reutiliza template similar ao de reset de senha
+ */
+async function sendWhatsAppAlertEmail(barbershopEmail, barbershopName, alertType = 'disconnected') {
+  try {
+    const sgMail = (await import('@sendgrid/mail')).default;
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+    const subject =
+      alertType === 'disconnected'
+        ? '⚠️ Alerta: WhatsApp da sua barbearia foi desconectado'
+        : '❌ Erro: Falha ao conectar WhatsApp';
+
+    const message =
+      alertType === 'disconnected'
+        ? 'Sua sessão do WhatsApp foi interrompida. Notificações automáticas não serão mais enviadas.'
+        : 'Houve um erro ao tentar conectar o WhatsApp. Por favor, tente novamente.';
+
+    await sgMail.send({
+      to: barbershopEmail,
+      from: 'alertas@filalivre.app.br',
+      subject,
+      html: `
+        <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+          <div style="background:#dc2626;padding:32px;text-align:center;">
+            <h1 style="color:#ffffff;margin:0;font-size:28px;letter-spacing:-0.5px;">⚠️ Alerta do FilaLivre</h1>
+            <p style="color:#fecaca;margin:8px 0 0;font-size:14px;">Ação necessária em sua conta</p>
+          </div>
+          <div style="padding:32px;">
+            <h2 style="color:#1e293b;font-size:20px;margin:0 0 16px;">${subject.replace(/^[⚠️❌] /, '')}</h2>
+            <p style="color:#475569;font-size:15px;line-height:1.6;margin:0 0 24px;">
+              Olá, proprietário de <strong>${barbershopName || 'sua barbearia'}</strong>,
+            </p>
+            <p style="color:#475569;font-size:15px;line-height:1.6;margin:0 0 24px;">
+              ${message}
+            </p>
+            <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin:24px 0;">
+              <p style="color:#7f1d1d;font-size:14px;margin:0;font-weight:600;">O que fazer:</p>
+              <ul style="color:#7f1d1d;font-size:14px;margin:8px 0 0;padding-left:20px;">
+                <li>Acesse o painel de administração</li>
+                <li>Vá para a seção de WhatsApp</li>
+                <li>Clique em "Conectar WhatsApp" e escaneie o QR Code com seu celular</li>
+              </ul>
+            </div>
+            <div style="text-align:center;margin:32px 0;">
+              <a href="https://filalivre.app.br/admin" style="display:inline-block;padding:14px 32px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;">
+                Ir para Dashboard
+              </a>
+            </div>
+            <p style="color:#94a3b8;font-size:13px;line-height:1.5;margin:24px 0 0;">
+              Se você recebe muitos alertas, pode haver um problema com sua conexão de internet ou o serviço WhatsApp. Entre em contato com nosso suporte se precisar de ajuda.
+            </p>
+          </div>
+          <div style="background:#f8fafc;padding:20px 32px;border-top:1px solid #e5e7eb;text-align:center;">
+            <p style="color:#94a3b8;font-size:12px;margin:0;">FilaLivre &copy; ${new Date().getFullYear()} &bull; Sistema de gestão de filas</p>
+          </div>
+        </div>
+      `,
+    });
+
+    console.log(`[WhatsApp] Email de alerta enviado para ${barbershopEmail}`);
+  } catch (error) {
+    console.error('[WhatsApp] Erro ao enviar email de alerta:', error.message);
+    // Não lance erro aqui - o email é secundário
+  }
+}
+
+async function callWhatsAppService(endpoint, method = 'POST', body = null) {
+  let lastError = null;
+  
+  for (const baseUrl of WHATSAPP_FALLBACK_URLS) {
+    try {
+      const url = `${baseUrl}${endpoint}`;
+      console.log(`[WhatsApp] [${method}] Chamando serviço: ${url}`);
+      
+      const options = {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 10000,
+      };
+      
+      if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
+        options.body = JSON.stringify(body);
+      }
+      
+      const response = await fetch(url, options);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log(`[WhatsApp] ✓ Sucesso em: ${url}`);
+      return data;
+    } catch (err) {
+      lastError = err;
+      console.error(`[WhatsApp] ✗ Erro em ${baseUrl}: ${err.message}`);
+    }
+  }
+  
+  throw new Error(`WhatsApp service indisponível: ${lastError?.message || 'Unknown error'}`);
+}
 
 export default class WhatsAppController {
   static async connect(req, res) {
@@ -18,41 +129,58 @@ export default class WhatsAppController {
         return res.status(400).json({ error: 'barbershopId é obrigatório' });
       }
 
-      const sessionName = 'barbershop_' + barbershopId;
-
-      if (isSessionActive(sessionName)) {
-        return res.json({
-          success: true,
-          message: 'Sessão WhatsApp já está ativa.',
-          status: 'connected',
-          qr: null,
-        });
-      }
-
-      const { qr } = await startSession(sessionName);
-
-      // Salva sessão no banco
-      await registerSession(barbershopId, qr ? 'waiting_qr' : 'connected');
+      console.log(`[WhatsApp] Iniciando sessão para barbearia ${barbershopId}`);
+      
+      const data = await callWhatsAppService(`/session/start`, 'POST', { barbershopId });
+      
+      // Registra no banco de dados local
+      await registerSession(barbershopId, data.qr ? 'waiting_qr' : 'connected');
+      console.log(`[WhatsApp] Sessão ${barbershopId} registrada no banco`);
 
       res.json({
         success: true,
-        message: qr ? 'QR gerado. Escaneie para conectar.' : 'Sessão conectada.',
-        status: qr ? 'waiting_qr' : 'connected',
-        qr: qr || null,
+        message: data.qr ? 'QR gerado. Escaneie para conectar.' : 'Sessão conectada.',
+        status: data.qr ? 'waiting_qr' : 'connected',
+        qr: data.qr || null,
       });
     } catch (err) {
       console.error('[WhatsApp] Erro ao conectar:', err.message);
-      res.status(500).json({ error: 'Erro ao iniciar sessão WhatsApp' });
+      
+      // Tenta enviar email de alerta para o dono da barbearia
+      try {
+        const [[owner]] = await pool.query(
+          'SELECT u.email, b.name FROM users u JOIN barbershops b ON u.barbershop_id = b.id WHERE b.id = ? AND u.role = ?',
+          [req.params.barbershopId, 'owner']
+        );
+        if (owner && owner.email) {
+          await sendWhatsAppAlertEmail(
+            owner.email,
+            owner.name,
+            'error'
+          );
+        }
+      } catch (emailErr) {
+        console.error('[WhatsApp] Erro ao enviar alerta por email:', emailErr.message);
+      }
+      
+      res.status(500).json({ 
+        error: 'Erro ao iniciar sessão WhatsApp',
+        details: err.message 
+      });
     }
   }
 
   static async disconnect(req, res) {
     try {
       const { barbershopId } = req.params;
-      const sessionName = 'barbershop_' + barbershopId;
 
-      await disconnectSession(sessionName);
+      console.log(`[WhatsApp] Desconectando barbearia ${barbershopId}`);
+      
+      await callWhatsAppService(`/session/stop`, 'POST', { barbershopId });
+      
+      // Registra desconexão no banco
       await registerSession(barbershopId, 'disconnected');
+      console.log(`[WhatsApp] Barbearia ${barbershopId} desconectada`);
 
       res.json({
         success: true,
@@ -61,37 +189,52 @@ export default class WhatsAppController {
       });
     } catch (err) {
       console.error('[WhatsApp] Erro ao desconectar:', err.message);
-      res.status(500).json({ error: 'Erro ao desconectar sessão' });
+      res.status(500).json({ 
+        error: 'Erro ao desconectar sessão',
+        details: err.message 
+      });
     }
   }
 
   static async status(req, res) {
     try {
       const { barbershopId } = req.params;
-      const sessionName = 'barbershop_' + barbershopId;
-      const active = isSessionActive(sessionName);
+      
+      console.log(`[WhatsApp] Verificando status da barbearia ${barbershopId}`);
+      
+      const data = await callWhatsAppService(`/session/status?barbershopId=${barbershopId}`, 'GET');
       const dbSession = await getSessionFromDB(barbershopId);
 
       res.json({
-        session: sessionName,
-        active,
-        status: active ? 'connected' : (dbSession?.status || 'disconnected'),
-        qr: active ? null : getLastQR(sessionName),
+        session: `barbershop_${barbershopId}`,
+        active: data.isActive || false,
+        status: data.isActive ? 'connected' : (dbSession?.status || 'disconnected'),
+        qr: data.qr || null,
       });
     } catch (err) {
-      res.status(500).json({ error: 'Erro ao verificar status' });
+      console.error('[WhatsApp] Erro ao verificar status:', err.message);
+      res.status(500).json({ 
+        error: 'Erro ao verificar status',
+        details: err.message 
+      });
     }
   }
 
   static async qr(req, res) {
     try {
       const { barbershopId } = req.params;
-      const sessionName = 'barbershop_' + barbershopId;
-      const qr = getLastQR(sessionName);
+      
+      console.log(`[WhatsApp] Obtendo QR code para barbearia ${barbershopId}`);
+      
+      const data = await callWhatsAppService(`/session/qr?barbershopId=${barbershopId}`, 'GET');
 
-      res.json({ qr: qr || null });
+      res.json({ qr: data.qr || null });
     } catch (err) {
-      res.status(500).json({ error: 'Erro ao buscar QR' });
+      console.error('[WhatsApp] Erro ao buscar QR:', err.message);
+      res.status(500).json({ 
+        error: 'Erro ao buscar QR code',
+        details: err.message 
+      });
     }
   }
 
