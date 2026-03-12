@@ -8,6 +8,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { FilaLivreLogo } from '@/components/ui/filalivre-logo';
 import { useAuth } from '@/hooks';
+import { ProjectsSection } from '@/components/ProjectsSection';
 
 export function LandingPage() {
   const title = 'Sistema de Gestão de Filas para Atendimento Presencial';
@@ -591,35 +592,111 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* Sobre o criador */}
-      <section className="py-24 bg-white">
-        <div className="max-w-4xl mx-auto px-4">
+      {/* Sobre o Fundador */}
+      <section className="py-24 bg-white" aria-labelledby="about-title">
+        <div className="max-w-6xl mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-center"
+            transition={{ duration: 0.5 }}
           >
-            <h2 className="text-4xl sm:text-5xl font-bold text-neutral-900 mb-8">
-              Sobre
-            </h2>
-            <div className="bg-neutral-50 rounded-2xl p-12 shadow-lg">
-              <div className="w-20 h-20 rounded-full bg-neutral-900 flex items-center justify-center mx-auto mb-6">
-                <User className="w-10 h-10 text-white" />
-              </div>
-              <p className="text-lg text-neutral-700 leading-relaxed mb-4">
-                Criado por <span className="font-bold text-neutral-900">Edson Felix</span>.
-              </p>
-              <p className="text-lg text-neutral-700 leading-relaxed mb-4">
-                Desenvolvedor em transição de carreira que decidiu resolver um problema real de atendimento presencial: a confusão nas filas.
-              </p>
-              <p className="text-lg text-neutral-700 leading-relaxed">
-                O projeto nasceu com a ideia de transformar filas em uma experiência simples, visual e organizada.
+            {/* Título */}
+            <div className="text-center mb-16">
+              <h2 id="about-title" className="text-4xl sm:text-5xl font-bold text-neutral-900 mb-4">
+                Sobre o Fundador
+              </h2>
+              <p className="text-lg text-neutral-600">
+                Conheca a história por trás do FilaLivre
               </p>
             </div>
+
+            {/* Grid Responsivo */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+              {/* Foto e Informações do Fundador */}
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+                className="flex flex-col items-center lg:items-start"
+              >
+                {/* Foto do Fundador */}
+                <div className="mb-8 w-full flex justify-center lg:justify-start">
+                  <div className="relative">
+                    <div className="w-64 h-64 rounded-2xl overflow-hidden shadow-xl border-4 border-neutral-100 bg-neutral-100">
+                      <img
+                        src="/images/edsonFounder.JPG"
+                        alt="Edson Felix - Founder & CEO"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Fallback se imagem não existir
+                          const target = e.target as HTMLImageElement;
+                          target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect fill="%23f5f5f5" width="256" height="256"/><circle cx="128" cy="80" r="32" fill="%23d4d4d8"/><path d="M64 200c0-35.3 28.7-64 64-64s64 28.7 64 64" fill="%23d4d4d8"/></svg>';
+                        }}
+                      />
+                    </div>
+                    {/* Badge */}
+                    <div className="absolute bottom-4 right-4 bg-neutral-900 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg">
+                      Founder & CEO
+                    </div>
+                  </div>
+                </div>
+
+                {/* Nome e Cargo */}
+                <div className="text-center lg:text-left">
+                  <h3 className="text-3xl font-bold text-neutral-900 mb-2">Edson Felix</h3>
+                  <p className="text-lg text-neutral-600 font-medium mb-4">Founder & CEO</p>
+                  <p className="text-sm text-neutral-500 max-w-sm">
+                    Administrador | Desenvolvedor | Empreendedor
+                  </p>
+                </div>
+              </motion.div>
+
+              {/* Texto Institucional e Frase de Impacto */}
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="space-y-6"
+              >
+                {/* Biografia */}
+                <div className="space-y-4">
+                  <p className="text-base text-neutral-700 leading-relaxed">
+                    Edson Felix é <span className="font-semibold text-neutral-900">administrador com mais de 17 anos de experiência</span> nas áreas de gestão e finanças. Após anos lidando com desafios operacionais em negócios reais, decidiu migrar para tecnologia com o objetivo de resolver problemas do cotidiano através de software.
+                  </p>
+
+                  <p className="text-base text-neutral-700 leading-relaxed">
+                    Ao longo dessa transição desenvolveu diversos projetos e aplicações, incluindo <span className="font-semibold text-neutral-900">sistemas de gestão, plataformas digitais e soluções de automação</span> para negócios de diferentes setores.
+                  </p>
+
+                  <p className="text-base text-neutral-700 leading-relaxed">
+                    O <span className="font-semibold text-neutral-900">FilaLivre nasceu justamente dessa visão</span>: transformar filas desorganizadas em uma experiência simples, eficiente e digital para empresas e clientes.
+                  </p>
+                </div>
+
+                {/* Separador */}
+                <div className="h-px bg-neutral-200"></div>
+
+                {/* Frase de Impacto */}
+                <div className="bg-gradient-to-r from-neutral-50 to-neutral-100 rounded-2xl border border-neutral-200 p-8">
+                  <blockquote className="text-2xl font-bold text-neutral-900 italic text-center">
+                    "Boas empresas gerenciam pessoas. Grandes empresas gerenciam tempo."
+                  </blockquote>
+                  <p className="text-sm text-neutral-600 text-center mt-4">— Edson Felix</p>
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Divider */}
+            <div className="mt-16 h-px bg-neutral-200"></div>
           </motion.div>
         </div>
       </section>
+
+      {/* Projetos Desenvolvidos */}
+      <ProjectsSection />
 
       {/* CTA final */}
       <section className="py-20 bg-neutral-900" aria-labelledby="cta-final">
