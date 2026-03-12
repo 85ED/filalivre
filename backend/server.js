@@ -15,31 +15,27 @@ import { seedPlatformOwner } from './src/seeds/platformOwner.js';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middlewares
-// CORS configuration: read CORS_ORIGIN from environment (comma-separated values)
+// CORS precisa vir antes de qualquer rota
 const allowedOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
   : [];
 
 const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin) {
-      return callback(null, true);
-    }
+  origin: function(origin, callback) {
+    // permite chamadas sem origin (curl, health checks)
+    if (!origin) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
-    return callback(null, true);
+    return callback(null, false);
   },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  credentials: true
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+app.options('*', cors(corsOptions)); // responde preflight
 
 // Stripe webhook needs raw body — must be before express.json()
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), StripeWebhookController.handle);
