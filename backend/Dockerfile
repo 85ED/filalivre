@@ -37,9 +37,12 @@ ENV CHROME_BIN=/usr/bin/chromium
 ENV NODE_ENV=production
 
 # Exposed ports for multiple services
-EXPOSE 8080  # API
-EXPOSE 3003  # WhatsApp service
-EXPOSE 8888  # Worker
+# API
+EXPOSE 8080
+# WhatsApp service
+EXPOSE 3003
+# Worker
+EXPOSE 8888
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["/usr/sbin/dumb-init", "--"]
