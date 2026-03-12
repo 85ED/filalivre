@@ -6,6 +6,8 @@ import {
   registerSession,
   getSessionFromDB,
 } from '../services/WhatsAppService.js';
+import WhatsAppUsageService from '../services/WhatsAppUsageService.js';
+import StripeService from '../services/StripeService.js';
 
 export default class WhatsAppController {
   static async connect(req, res) {
@@ -90,6 +92,106 @@ export default class WhatsAppController {
       res.json({ qr: qr || null });
     } catch (err) {
       res.status(500).json({ error: 'Erro ao buscar QR' });
+    }
+  }
+
+  /**
+   * GET /api/whatsapp/usage
+   * Retorna estatísticas de uso de WhatsApp para a barbearia autenticada
+   * Requer autenticação: usa barbershopId do token JWT
+   */
+  static async getUsage(req, res) {
+    try {
+      // Get barbershopId from authenticated user
+      const userBarbershopId = req.user?.barbershopId;
+      if (!userBarbershopId) {
+        return res.status(401).json({
+          error: 'Unauthorized - barbershopId not found in token',
+        });
+      }
+
+      // Optional: Allow query param but validate ownership
+      const queryBarbershopId = parseInt(req.query.barbershopId);
+      if (queryBarbershopId && queryBarbershopId !== userBarbershopId) {
+        return res.status(403).json({
+          error: 'Forbidden - you can only view your own barbershop usage',
+        });
+      }
+
+      const stats = await WhatsAppUsageService.getStats(userBarbershopId);
+
+      return res.status(200).json({
+        success: true,
+        data: stats,
+      });
+    } catch (error) {
+      console.error('[WhatsAppController] getUsage error:', error);
+      return res.status(500).json({
+        error: 'Failed to fetch WhatsApp usage statistics',
+        details: error.message,
+      });
+    }
+  }
+
+  /**
+   * POST /api/whatsapp/buy-credits
+   * Inicia processo de compra de créditos WhatsApp via Stripe
+   * Body: { package: "100" | "300" | "1000" }
+   *
+   * Response: { url: "https://checkout.stripe.com/..." }
+   */
+  static async buyCredits(req, res) {
+    try {
+      // Get barbershopId from authenticated user
+      const userBarbershopId = req.user?.barbershopId;
+      if (!userBarbershopId) {
+        return res.status(401).json({
+          error: 'Unauthorized - barbershopId not found in token',
+        });
+      }
+
+      const { package: packageName } = req.body;
+
+      if (!packageName) {
+        return res.status(400).json({
+          error: 'package is required (100, 300, or 1000)',
+        });
+      }
+
+      // Verify Stripe is configured
+      if (!StripeService.isConfigured()) {
+        return res.status(503).json({
+          error: 'Stripe não configurado. Configure STRIPE_SECRET_KEY.',
+        });
+      }
+
+      // Build redirect URLs
+      const baseUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:5173';
+      const successUrl = `${baseUrl}/admin?payment=success&type=whatsapp_credits`;
+      const cancelUrl = `${baseUrl}/admin?payment=cancelled&type=whatsapp_credits`;
+
+      // Create Stripe checkout session
+      const stripeSession = await StripeService.createWhatsAppCreditsSession({
+        barbershopId: userBarbershopId,
+        packageQuantity: parseInt(packageName),
+        successUrl,
+        cancelUrl,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          url: stripeSession.url,
+          sessionId: stripeSession.sessionId,
+        },
+      });
+    } catch (error) {
+      console.error('[WhatsAppController] buyCredits error:', error);
+
+      return res.status(500).json({
+        error: 'Failed to initiate credit purchase',
+        details: error.message,
+      });
     }
   }
 }

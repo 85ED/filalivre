@@ -1,6 +1,7 @@
 import Queue from '../models/Queue.js';
 import Barber from '../models/Barber.js';
 import { createValidationError, createNotFoundError } from '../middlewares/validators.js';
+import WhatsAppNotificationService from './WhatsAppNotificationService.js';
 
 export class QueueService {
   static async joinQueue(barbershopId, clientName, clientIp = null, barberId = null, phone = null) {
@@ -80,6 +81,17 @@ export class QueueService {
     await Barber.setCurrentClient(barberId, clientQueueId);
 
     const client = await Queue.findById(clientQueueId);
+
+    // Trigger WhatsApp notification asynchronously (non-blocking)
+    try {
+      WhatsAppNotificationService.notifyIfEligible(barbershopId, clientQueueId).catch((err) => {
+        console.error('[Queue] WhatsApp notification error:', err.message);
+      });
+    } catch (err) {
+      console.error('[Queue] Failed to trigger WhatsApp notification:', err.message);
+      // Don't block queue operations if notification fails
+    }
+
     return client;
   }
 

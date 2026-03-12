@@ -34,12 +34,70 @@ export class StripeService {
       }],
       success_url: successUrl,
       cancel_url: cancelUrl,
-      metadata: { barbershop_id: String(barbershopId) },
-      subscription_data: { metadata: { barbershop_id: String(barbershopId) } },
+      metadata: { 
+        type: 'subscription',
+        barbershop_id: String(barbershopId) 
+      },
+      subscription_data: { 
+        metadata: { 
+          type: 'subscription',
+          barbershop_id: String(barbershopId) 
+        } 
+      },
     };
     if (customerId) params.customer = customerId;
     else if (customerEmail) params.customer_email = customerEmail;
     return stripe.checkout.sessions.create(params);
+  }
+
+  static async createWhatsAppCreditsSession({ barbershopId, packageQuantity, successUrl, cancelUrl }) {
+    if (!stripe) throw new Error('Stripe não configurado');
+    
+    // Importar pacotes de créditos WhatsApp
+    const { WHATSAPP_CREDIT_PACKAGES } = await import('../../env.js');
+    
+    // Validar pacote
+    const selectedPackage = WHATSAPP_CREDIT_PACKAGES.find(
+      (p) => p.quantity === packageQuantity.toString()
+    );
+    if (!selectedPackage) {
+      throw new Error(
+        `Invalid package: ${packageQuantity}. Available: ${WHATSAPP_CREDIT_PACKAGES.map((p) => p.quantity).join(', ')}`
+      );
+    }
+
+    // Criar sessão Stripe de pagamento único (one-time payment)
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      locale: 'pt-BR',
+      line_items: [
+        {
+          price_data: {
+            currency: selectedPackage.currency,
+            product_data: {
+              name: selectedPackage.name,
+              description: selectedPackage.description,
+            },
+            unit_amount: selectedPackage.price,
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      // Guardar informações para usar no webhook
+      metadata: {
+        type: 'whatsapp_credits',
+        barbershop_id: barbershopId.toString(),
+        package_quantity: packageQuantity.toString(),
+      },
+    });
+
+    return {
+      sessionId: session.id,
+      url: session.url,
+    };
   }
 
   static async updateSubscriptionQuantity(subscriptionId, newQuantity) {

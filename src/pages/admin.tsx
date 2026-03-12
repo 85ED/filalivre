@@ -37,6 +37,8 @@ import { barberService } from '@/services/barberService';
 import { queueService } from '@/services/queueService';
 import type { Barber } from '@/types';
 import { FilaLivreLogo } from '@/components/ui/filalivre-logo';
+import { WhatsAppUsageCard } from '@/components/WhatsAppUsageCard';
+import { BuyCreditsModal } from '@/components/BuyCreditsModal';
 
 type Period = 'today' | 'week' | 'month';
 type View = 'overview' | 'byBarber' | 'barberDetail' | 'whatsapp' | 'professionals';
@@ -86,12 +88,37 @@ export function AdminPage() {
   const [imageUrlSaving, setImageUrlSaving] = useState(false);
   const [imageUrlSaved, setImageUrlSaved] = useState(false);
 
+  // WhatsApp Credits state
+  const [buyCreditsModalOpen, setBuyCreditsModalOpen] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [paymentType, setPaymentType] = useState<'subscription' | 'whatsapp_credits' | null>(null);
+
   // Sync imageUrl when barbershop data loads
   useEffect(() => {
     if (barbershop && (barbershop as any).image_url !== undefined) {
       setImageUrl((barbershop as any).image_url || '');
     }
   }, [barbershop]);
+
+  // Detectar retorno do Stripe após pagamento
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get('payment');
+    const type = params.get('type') as 'subscription' | 'whatsapp_credits' | null;
+
+    if (payment === 'success' && type === 'whatsapp_credits') {
+      setPaymentSuccess(true);
+      setPaymentType(type);
+      // Auto-fechar mensagem após 5 segundos
+      const timer = setTimeout(() => {
+        setPaymentSuccess(false);
+        setPaymentType(null);
+        // Limpar query params
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   const handleSaveImageUrl = async () => {
     if (!barbershopId) {
@@ -335,6 +362,28 @@ export function AdminPage() {
     <div className="min-h-screen bg-neutral-50 pb-24 max-w-full overflow-x-hidden">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8 space-y-6">
 
+        {/* Mensagem de Sucesso - Pagamento WhatsApp Credits */}
+        {paymentSuccess && paymentType === 'whatsapp_credits' && (
+          <AnimatePresence>
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="rounded-xl bg-green-50 border border-green-200 p-4"
+            >
+              <div className="flex items-start gap-3">
+                <Check className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-green-900">Compra realizada com sucesso! ✅</h3>
+                  <p className="text-sm text-green-700 mt-1">
+                    Seus créditos WhatsApp foram adicionados à sua conta. Atualize a página para ver o novo saldo.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        )}
+
         {/* HEADER */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-center justify-between gap-3 max-w-full overflow-hidden">
           {/* Linha 1: Logo/title + WhatsApp chip */}
@@ -490,6 +539,17 @@ export function AdminPage() {
                     </motion.div>
                   );
                 })}
+              </div>
+
+              {/* WhatsApp Usage Card */}
+              <div className="grid lg:grid-cols-2 gap-6">
+                <motion.div
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.25 }}
+                >
+                  <WhatsAppUsageCard onBuyCreditsClick={() => setBuyCreditsModalOpen(true)} />
+                </motion.div>
               </div>
 
               {/* Barbers → Profissionais */}
@@ -1105,6 +1165,12 @@ export function AdminPage() {
           </div>
         )}
       </div>
+
+      {/* BuyCredits Modal */}
+      <BuyCreditsModal 
+        open={buyCreditsModalOpen} 
+        onOpenChange={setBuyCreditsModalOpen}
+      />
 
       {/* Footer */}
       <footer className="py-6 bg-neutral-900 text-white mt-8">

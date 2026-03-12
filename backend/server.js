@@ -6,6 +6,7 @@ import authRoutes from './src/routes/auth.js';
 import queueRoutes from './src/routes/queue.js';
 import barberRoutes from './src/routes/barbers.js';
 import barbershopRoutes from './src/routes/barbershops.js';
+import whatsappRoutes from './src/routes/whatsapp.js';
 import SubscriptionController from './src/controllers/SubscriptionController.js';
 import StripeWebhookController from './src/controllers/StripeWebhookController.js';
 import { runMigrations } from './src/seeds/migrate.js';
@@ -47,6 +48,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/queue', queueRoutes);
 app.use('/api/barbers', barberRoutes);
 app.use('/api/barbershops', barbershopRoutes);
+
+// WhatsApp — local routes (usage and credits) MUST come before proxy catchall
+app.use('/api/whatsapp', whatsappRoutes);
 
 // Subscription (Stripe) — per-seat model
 app.post('/api/subscription/checkout', authMiddleware, roleMiddleware(['admin', 'owner']), SubscriptionController.createCheckout);
@@ -164,9 +168,17 @@ app.get('/api/whatsapp-diagnostic', async (req, res) => {
   });
 });
 
-app.use('/api/whatsapp', async (req, res) => {
+app.use('/api/whatsapp', async (req, res, next) => {
   const relativePath = req.originalUrl.replace(/^\/api\/whatsapp/, '') || '/';
-  
+
+  // Skip proxy for local routes handled by whatsappRoutes
+  if (
+    (relativePath.startsWith('/usage') && req.method === 'GET') ||
+    (relativePath.startsWith('/buy-credits') && req.method === 'POST')
+  ) {
+    return next();
+  }
+
   let lastError = null;
   let successUrl = null;
   
