@@ -28,9 +28,6 @@ RUN npm ci --only=production
 # Copy application code
 COPY . .
 
-# Copy environment file
-COPY .env .env
-
 # Configure Puppeteer to use system Chromium (not bundled download)
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV CHROME_EXECUTABLE_PATH=/usr/bin/chromium-browser
