@@ -21,14 +21,14 @@ const allowedOrigins = process.env.CORS_ORIGIN
   : [];
 
 app.use(cors({
-  origin: allowedOrigins,
+  origin: allowedOrigins.length ? allowedOrigins : true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // responder qualquer preflight imediatamente
-app.options('*', (req, res) => {
+app.options(/.*/, (req, res) => {
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
