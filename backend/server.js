@@ -54,7 +54,8 @@ app.post('/api/subscription/portal', authMiddleware, roleMiddleware(['admin', 'o
 app.get('/api/subscription/seat-info', authMiddleware, roleMiddleware(['admin', 'owner']), SubscriptionController.getSeatInfo);
 
 // WhatsApp — proxy requests to filalivre-whatsapp microservice
-const WHATSAPP_SERVICE_URL = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3003';
+const WHATSAPP_SERVICE_URL =
+  process.env.WHATSAPP_SERVICE_URL || 'http://filalivre-whatsapp:3003';
 const WHATSAPP_FALLBACK_URLS = [
   WHATSAPP_SERVICE_URL,
   'http://filalivre-whatsapp.railway.internal:3003',
