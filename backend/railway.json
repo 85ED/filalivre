@@ -1,0 +1,11 @@
+{
+  "build": {
+    "builder": "dockerfile",
+    "context": "."
+  },
+  "deploy": {
+    "startCommand": "cd backend && chmod +x start-services.sh && ./start-services.sh",
+    "restartPolicyMaxRetries": 5,
+    "restartPolicyWindowSeconds": 600
+  }
+}
