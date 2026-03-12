@@ -14,6 +14,9 @@ export function useAuth() {
       authService.getCurrentUser()
         .then((response) => {
           setUser(response.user);
+          if (response.user.barbershopId) {
+            localStorage.setItem('barbershop_id', String(response.user.barbershopId));
+          }
           if (response.user.barberId) {
             localStorage.setItem('barber_id', String(response.user.barberId));
           }
@@ -75,6 +78,12 @@ export function useAuth() {
       setLoading(true);
       const response = await authService.getCurrentUser();
       setUser(response.user);
+      if (response.user.barbershopId) {
+        localStorage.setItem('barbershop_id', String(response.user.barbershopId));
+      }
+      if (response.user.barberId) {
+        localStorage.setItem('barber_id', String(response.user.barberId));
+      }
       return response.user;
     } catch (err) {
       setError(err as Error);

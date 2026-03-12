@@ -90,7 +90,7 @@ async function callWhatsAppService(endpoint, method = 'POST', body = null) {
   for (const baseUrl of WHATSAPP_FALLBACK_URLS) {
     try {
       const url = `${baseUrl}${endpoint}`;
-      console.log(`[WhatsApp] [${method}] Chamando serviço: ${url}`);
+      console.log(`[WhatsApp.callService] [${method}] Tentando: ${url}`);
       
       const options = {
         method,
@@ -105,19 +105,22 @@ async function callWhatsAppService(endpoint, method = 'POST', body = null) {
       const response = await fetch(url, options);
       
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
       }
       
       const data = await response.json();
-      console.log(`[WhatsApp] ✓ Sucesso em: ${url}`);
+      console.log(`[WhatsApp.callService] ✓ Sucesso em: ${baseUrl}`);
       return data;
     } catch (err) {
       lastError = err;
-      console.error(`[WhatsApp] ✗ Erro em ${baseUrl}: ${err.message}`);
+      console.warn(`[WhatsApp.callService] ✗ Falha em ${baseUrl}: ${err.message}`);
     }
   }
   
-  throw new Error(`WhatsApp service indisponível: ${lastError?.message || 'Unknown error'}`);
+  console.error(`[WhatsApp.callService] ❌ Nenhuma URL funcionou:`, WHATSAPP_FALLBACK_URLS);
+  console.error(`[WhatsApp.callService] Último erro:`, lastError?.message);
+  throw new Error(`WhatsApp service indisponível. Testadas: ${WHATSAPP_FALLBACK_URLS.join(', ')}. Erro: ${lastError?.message || 'Unknown error'}`);
 }
 
 export default class WhatsAppController {
@@ -125,17 +128,21 @@ export default class WhatsAppController {
     try {
       const { barbershopId } = req.params;
 
-      if (!barbershopId) {
-        return res.status(400).json({ error: 'barbershopId é obrigatório' });
+      console.log(`[WhatsApp.connect] INICIANDO - barbershopId: ${barbershopId}, params:`, req.params);
+
+      if (!barbershopId || barbershopId === '0' || isNaN(parseInt(barbershopId))) {
+        console.error(`[WhatsApp.connect] ❌ barbershopId INVÁLIDO: "${barbershopId}"`);
+        return res.status(400).json({ error: 'barbershopId deve ser um número válido e diferente de 0' });
       }
 
-      console.log(`[WhatsApp] Iniciando sessão para barbearia ${barbershopId}`);
+      const parsedBarbershopId = parseInt(barbershopId);
+      console.log(`[WhatsApp.connect] ✓ barbershopId validado: ${parsedBarbershopId}`);
       
-      const data = await callWhatsAppService(`/session/start`, 'POST', { barbershopId });
+      const data = await callWhatsAppService(`/session/start`, 'POST', { barbershopId: parsedBarbershopId });
       
       // Registra no banco de dados local
-      await registerSession(barbershopId, data.qr ? 'waiting_qr' : 'connected');
-      console.log(`[WhatsApp] Sessão ${barbershopId} registrada no banco`);
+      await registerSession(parsedBarbershopId, data.qr ? 'waiting_qr' : 'connected');
+      console.log(`[WhatsApp.connect] ✓ Sessão ${parsedBarbershopId} registrada no banco`);
 
       res.json({
         success: true,
@@ -144,7 +151,7 @@ export default class WhatsAppController {
         qr: data.qr || null,
       });
     } catch (err) {
-      console.error('[WhatsApp] Erro ao conectar:', err.message);
+      console.error('[WhatsApp.connect] ❌ Erro:', err.message);
       
       // Tenta enviar email de alerta para o dono da barbearia
       try {
@@ -174,13 +181,20 @@ export default class WhatsAppController {
     try {
       const { barbershopId } = req.params;
 
-      console.log(`[WhatsApp] Desconectando barbearia ${barbershopId}`);
+      console.log(`[WhatsApp.disconnect] INICIANDO - barbershopId: ${barbershopId}`);
+
+      if (!barbershopId || barbershopId === '0' || isNaN(parseInt(barbershopId))) {
+        console.error(`[WhatsApp.disconnect] ❌ barbershopId INVÁLIDO: "${barbershopId}"`);
+        return res.status(400).json({ error: 'barbershopId deve ser um número válido e diferente de 0' });
+      }
+
+      const parsedBarbershopId = parseInt(barbershopId);
       
-      await callWhatsAppService(`/session/stop`, 'POST', { barbershopId });
+      await callWhatsAppService(`/session/stop`, 'POST', { barbershopId: parsedBarbershopId });
       
       // Registra desconexão no banco
-      await registerSession(barbershopId, 'disconnected');
-      console.log(`[WhatsApp] Barbearia ${barbershopId} desconectada`);
+      await registerSession(parsedBarbershopId, 'disconnected');
+      console.log(`[WhatsApp.disconnect] ✓ Barbearia ${parsedBarbershopId} desconectada`);
 
       res.json({
         success: true,
@@ -188,7 +202,7 @@ export default class WhatsAppController {
         status: 'disconnected',
       });
     } catch (err) {
-      console.error('[WhatsApp] Erro ao desconectar:', err.message);
+      console.error('[WhatsApp.disconnect] ❌ Erro:', err.message);
       res.status(500).json({ 
         error: 'Erro ao desconectar sessão',
         details: err.message 
@@ -200,19 +214,29 @@ export default class WhatsAppController {
     try {
       const { barbershopId } = req.params;
       
-      console.log(`[WhatsApp] Verificando status da barbearia ${barbershopId}`);
+      console.log(`[WhatsApp.status] INICIANDO - barbershopId: ${barbershopId}, params:`, req.params);
+
+      if (!barbershopId || barbershopId === '0' || isNaN(parseInt(barbershopId))) {
+        console.error(`[WhatsApp.status] ❌ barbershopId INVÁLIDO: "${barbershopId}"`);
+        return res.status(400).json({ error: 'barbershopId deve ser um número válido e diferente de 0' });
+      }
+
+      const parsedBarbershopId = parseInt(barbershopId);
+      console.log(`[WhatsApp.status] ✓ barbershopId validado: ${parsedBarbershopId}`);
       
-      const data = await callWhatsAppService(`/session/status?barbershopId=${barbershopId}`, 'GET');
-      const dbSession = await getSessionFromDB(barbershopId);
+      const data = await callWhatsAppService(`/session/status?barbershopId=${parsedBarbershopId}`, 'GET');
+      const dbSession = await getSessionFromDB(parsedBarbershopId);
+
+      console.log(`[WhatsApp.status] ✓ Status obtido - active: ${data.isActive}, dbSession:`, dbSession?.status);
 
       res.json({
-        session: `barbershop_${barbershopId}`,
+        session: `barbershop_${parsedBarbershopId}`,
         active: data.isActive || false,
         status: data.isActive ? 'connected' : (dbSession?.status || 'disconnected'),
         qr: data.qr || null,
       });
     } catch (err) {
-      console.error('[WhatsApp] Erro ao verificar status:', err.message);
+      console.error('[WhatsApp.status] ❌ Erro:', err.message);
       res.status(500).json({ 
         error: 'Erro ao verificar status',
         details: err.message 
@@ -224,13 +248,22 @@ export default class WhatsAppController {
     try {
       const { barbershopId } = req.params;
       
-      console.log(`[WhatsApp] Obtendo QR code para barbearia ${barbershopId}`);
+      console.log(`[WhatsApp.qr] INICIANDO - barbershopId: ${barbershopId}`);
+
+      if (!barbershopId || barbershopId === '0' || isNaN(parseInt(barbershopId))) {
+        console.error(`[WhatsApp.qr] ❌ barbershopId INVÁLIDO: "${barbershopId}"`);
+        return res.status(400).json({ error: 'barbershopId deve ser um número válido e diferente de 0' });
+      }
+
+      const parsedBarbershopId = parseInt(barbershopId);
       
-      const data = await callWhatsAppService(`/session/qr?barbershopId=${barbershopId}`, 'GET');
+      const data = await callWhatsAppService(`/session/qr?barbershopId=${parsedBarbershopId}`, 'GET');
+
+      console.log(`[WhatsApp.qr] ✓ QR obtido para barbearia ${parsedBarbershopId}`);
 
       res.json({ qr: data.qr || null });
     } catch (err) {
-      console.error('[WhatsApp] Erro ao buscar QR:', err.message);
+      console.error('[WhatsApp.qr] ❌ Erro:', err.message);
       res.status(500).json({ 
         error: 'Erro ao buscar QR code',
         details: err.message 
