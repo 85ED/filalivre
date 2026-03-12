@@ -4,7 +4,7 @@
     "context": "."
   },
   "deploy": {
-    "startCommand": "node server.js",
+    "startCommand": "node server.whatsapp.js",
     "restartPolicyMaxRetries": 5,
     "restartPolicyWindowSeconds": 600
   }
