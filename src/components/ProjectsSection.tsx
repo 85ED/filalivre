@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion';
 import { BookOpen, FileText, Settings, Code2, ArrowRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 
 interface Project {
   icon: React.ReactNode;
@@ -49,10 +48,10 @@ export function ProjectsSection() {
           {/* Título */}
           <div className="text-center mb-16">
             <h2 id="projects-title" className="text-4xl sm:text-5xl font-bold text-neutral-900 mb-4">
-              Projetos Desenvolvidos
+              Experiência em produtos digitais
             </h2>
             <p className="text-lg text-neutral-600 max-w-2xl mx-auto">
-              Portfólio de soluções criadas para resolver problemas reais em diferentes setores
+              Soluções desenvolvidas para resolver desafios reais em diferentes setores
             </p>
           </div>
 
@@ -97,25 +96,6 @@ export function ProjectsSection() {
           </div>
 
           {/* CTA */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-            className="mt-16 text-center"
-          >
-            <p className="text-neutral-600 mb-6 text-lg">
-              Tem um projeto em mente? Vamos conversar sobre como podemos ajudar.
-            </p>
-            <Button
-              size="lg"
-              variant="outline"
-              className="rounded-xl text-lg h-12 px-8 font-semibold border-2 hover:bg-neutral-900 hover:text-white"
-            >
-              Solicitar Orçamento
-              <ArrowRight className="ml-2 w-5 h-5" />
-            </Button>
-          </motion.div>
         </motion.div>
       </div>
     </section>

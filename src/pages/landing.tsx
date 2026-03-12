@@ -604,10 +604,10 @@ export function LandingPage() {
             {/* Título */}
             <div className="text-center mb-16">
               <h2 id="about-title" className="text-4xl sm:text-5xl font-bold text-neutral-900 mb-4">
-                Sobre o Fundador
+                A origem do FilaLivre
               </h2>
               <p className="text-lg text-neutral-600">
-                Conheca a história por trás do FilaLivre
+                Uma solução criada a partir de anos de experiência em gestão
               </p>
             </div>
 
@@ -664,15 +664,15 @@ export function LandingPage() {
                 {/* Biografia */}
                 <div className="space-y-4">
                   <p className="text-base text-neutral-700 leading-relaxed">
-                    Edson Felix é <span className="font-semibold text-neutral-900">administrador com mais de 17 anos de experiência</span> nas áreas de gestão e finanças. Após anos lidando com desafios operacionais em negócios reais, decidiu migrar para tecnologia com o objetivo de resolver problemas do cotidiano através de software.
+                    <span className="font-semibold text-neutral-900">17 anos de experiência</span> em gestão e finanças. Edson Felix trabalhou resolvendo desafios operacionais em negócios reais, até perceber que tecnologia poderia transformar essas soluções em escala.
                   </p>
 
                   <p className="text-base text-neutral-700 leading-relaxed">
-                    Ao longo dessa transição desenvolveu diversos projetos e aplicações, incluindo <span className="font-semibold text-neutral-900">sistemas de gestão, plataformas digitais e soluções de automação</span> para negócios de diferentes setores.
+                    Desde então desenvolveu <span className="font-semibold text-neutral-900">plataformas digitais e sistemas de automação</span> para empresas de diferentes setores, sempre focando em resolver problemas práticos de gestão.
                   </p>
 
                   <p className="text-base text-neutral-700 leading-relaxed">
-                    O <span className="font-semibold text-neutral-900">FilaLivre nasceu justamente dessa visão</span>: transformar filas desorganizadas em uma experiência simples, eficiente e digital para empresas e clientes.
+                    O FilaLivre é resultado dessa experiência: <span className="font-semibold text-neutral-900">simplificar o atendimento presencial</span> e melhorar a experiência tanto para as empresas quanto para seus clientes.
                   </p>
                 </div>
 
@@ -682,7 +682,7 @@ export function LandingPage() {
                 {/* Frase de Impacto */}
                 <div className="bg-gradient-to-r from-neutral-50 to-neutral-100 rounded-2xl border border-neutral-200 p-8">
                   <blockquote className="text-2xl font-bold text-neutral-900 italic text-center">
-                    "Boas empresas gerenciam pessoas. Grandes empresas gerenciam tempo."
+                    "Gestão eficiente não é sobre fazer mais rápido. É sobre fazer o tempo das pessoas valer mais."
                   </blockquote>
                   <p className="text-sm text-neutral-600 text-center mt-4">— Edson Felix</p>
                 </div>
