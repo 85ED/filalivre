@@ -6,18 +6,35 @@ const sessions = new Map();
 // Armazena último QR gerado por sessão (acessível pelo controller)
 const qrCodes = new Map();
 
-// Detecta Chromium do sistema (apt no Railway, ou fallback)
+// Detecta Chromium do sistema (crítico para Railway/Docker)
+// DEVE ser /usr/bin/chromium em Alpine/Linux, não fallback para bundled
 function getChromiumPath() {
-  const candidates = [
-    process.env.PUPPETEER_EXECUTABLE_PATH,
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/google-chrome-stable',
-  ].filter(Boolean);
-  for (const p of candidates) {
-    if (existsSync(p)) return p;
+  // Primeira tentativa: PUPPETEER_EXECUTABLE_PATH configurado
+  if (process.env.PUPPETEER_EXECUTABLE_PATH && existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
+    console.log('[WhatsApp] ✓ PUPPETEER_EXECUTABLE_PATH encontrado:', process.env.PUPPETEER_EXECUTABLE_PATH);
+    return process.env.PUPPETEER_EXECUTABLE_PATH;
   }
-  return undefined; // Usa Chromium bundled do puppeteer
+
+  // Fallbacks em ordem de preferência (Alpine Linux primeiro)
+  const candidates = [
+    '/usr/bin/chromium',           // Alpine Linux (Railway default)
+    '/usr/bin/chromium-browser',   // Debian/Ubuntu
+    '/usr/bin/google-chrome-stable', // Debian/Ubuntu
+    process.env.CHROME_BIN,        // Pode estar configured
+  ].filter(Boolean);
+
+  for (const p of candidates) {
+    if (existsSync(p)) {
+      console.log('[WhatsApp] ✓ Chromium encontrado em:', p);
+      return p;
+    }
+    console.log('[WhatsApp] ✗ Chromium não encontrado em:', p);
+  }
+
+  // Erro crítico - Chromium não encontrado
+  const errorMsg = `❌ CRÍTICO: Chromium não encontrado em nenhum dos locais: ${candidates.join(', ')}`;
+  console.error('[WhatsApp]', errorMsg);
+  throw new Error(errorMsg);
 }
 
 export async function startSession(sessionName) {
@@ -34,10 +51,9 @@ export async function startSession(sessionName) {
     setTimeout(() => resolve(null), 30000);
   });
 
+  // CRÍTICO: Sempre obter Chromium do sistema, não fallback para bundled
   const chromiumPath = getChromiumPath();
-  if (chromiumPath) {
-    console.log('[WhatsApp] Usando Chromium do sistema:', chromiumPath);
-  }
+  console.log('[WhatsApp] Iniciando sessão com Chromium:', chromiumPath);
 
   const client = await wppconnect.create({
     session: sessionName,
@@ -55,7 +71,8 @@ export async function startSession(sessionName) {
     headless: true,
     useChrome: false,
     logQR: true,
-    ...(chromiumPath ? { browserPathExecutable: chromiumPath } : {}),
+    // CRÍTICO: Sempre passar browserPathExecutable, não deixar undefined
+    browserPathExecutable: chromiumPath,
     browserArgs: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
