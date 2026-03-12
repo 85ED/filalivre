@@ -6,15 +6,17 @@ import WhatsAppUsageService from '../services/WhatsAppUsageService.js';
 import StripeService from '../services/StripeService.js';
 import pool from '../config/database.js';
 
-// WhatsApp microservice URL (agora em container Docker)
-const WHATSAPP_SERVICE_URL = 
-  process.env.WHATSAPP_SERVICE_URL || 'http://filalivre-whatsapp:3003';
-
+// WhatsApp microservice URL (configured in env.js with Railway URL as default)
+// Fallback URLs for local/Docker testing
+const WHATSAPP_SERVICE_URL = process.env.WHATSAPP_SERVICE_URL;
 const WHATSAPP_FALLBACK_URLS = [
   WHATSAPP_SERVICE_URL,
+  // Local/Docker fallbacks (only if env var not set)
   'http://filalivre-whatsapp.railway.internal:3003',
-  'http://filalivre-whatsapp:3003',
+  'http://localhost:3003',
 ];
+
+console.log('[WhatsApp] Service URL configured:', WHATSAPP_SERVICE_URL);
 
 /**
  * Envia email de alerta para o proprietário da barbearia

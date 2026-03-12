@@ -1,11 +1,12 @@
 import { motion } from 'framer-motion';
-import { BookOpen, FileText, Settings, Code2, ArrowRight } from 'lucide-react';
+import { BookOpen, FileText, Settings, ArrowRight } from 'lucide-react';
 
 interface Project {
   icon: React.ReactNode;
   title: string;
   description: string;
   category: string;
+  url?: string;
 }
 
 const projects: Project[] = [
@@ -14,6 +15,7 @@ const projects: Project[] = [
     title: 'Guia de Corrida',
     description: 'Aplicação mobile para corredores rastrearem e melhorarem seu desempenho em treinos.',
     category: 'Mobile App',
+    url: 'https://guiadecorrida.com.br/',
   },
   {
     icon: <FileText className="w-8 h-8" />,
@@ -26,18 +28,13 @@ const projects: Project[] = [
     title: 'Acesso4',
     description: 'Plataforma de gestão de acesso com controle de permissões e auditoria completa.',
     category: 'Enterprise Software',
-  },
-  {
-    icon: <Code2 className="w-8 h-8" />,
-    title: 'Soluções Customizadas',
-    description: 'Aplicações web sob medida desenvolvidas para resolver desafios únicos de cada negócio.',
-    category: 'Desenvolvimento',
+    url: 'https://acesso4.com.br/',
   },
 ];
 
 export function ProjectsSection() {
   return (
-    <section className="py-24 bg-neutral-50" aria-labelledby="projects-title">
+    <section className="py-16 bg-neutral-50" aria-labelledby="projects-title">
       <div className="max-w-6xl mx-auto px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -46,7 +43,7 @@ export function ProjectsSection() {
           transition={{ duration: 0.5 }}
         >
           {/* Título */}
-          <div className="text-center mb-16">
+          <div className="text-center mb-12">
             <h2 id="projects-title" className="text-4xl sm:text-5xl font-bold text-neutral-900 mb-4">
               Experiência em produtos digitais
             </h2>
@@ -55,18 +52,11 @@ export function ProjectsSection() {
             </p>
           </div>
 
-          {/* Grid de Projetos */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {projects.map((project, index) => (
-              <motion.div
-                key={project.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="group"
-              >
-                <div className="h-full bg-white rounded-2xl p-8 shadow-sm hover:shadow-lg transition-shadow border border-neutral-200">
+          {/* Grid de Projetos - 3 colunas */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {projects.map((project, index) => {
+              const CardContent = (
+                <>
                   {/* Ícone */}
                   <div className="w-12 h-12 bg-neutral-100 rounded-xl flex items-center justify-center text-neutral-900 mb-4 group-hover:bg-neutral-900 group-hover:text-white transition-colors">
                     {project.icon}
@@ -85,17 +75,43 @@ export function ProjectsSection() {
                   {/* Descrição */}
                   <p className="text-neutral-600 leading-relaxed mb-6">{project.description}</p>
 
-                  {/* Link */}
-                  <div className="flex items-center text-neutral-900 font-semibold group-hover:translate-x-1 transition-transform">
-                    Saiba mais
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                  {/* Link - mostrar apenas se tiver URL e não for FilaLivre */}
+                  {project.url && project.title !== 'FilaLivre' && (
+                    <div className="flex items-center text-neutral-900 font-semibold group-hover:translate-x-1 transition-transform">
+                      Saiba mais
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </div>
+                  )}
+                </>
+              );
 
-          {/* CTA */}
+              return (
+                <motion.div
+                  key={project.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                  className="group"
+                >
+                  {project.url ? (
+                    <a
+                      href={project.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="h-full bg-white rounded-2xl p-6 shadow-sm hover:shadow-lg transition-shadow border border-neutral-200 block"
+                    >
+                      {CardContent}
+                    </a>
+                  ) : (
+                    <div className="h-full bg-white rounded-2xl p-6 shadow-sm hover:shadow-lg transition-shadow border border-neutral-200">
+                      {CardContent}
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })}
+          </div>
         </motion.div>
       </div>
     </section>
