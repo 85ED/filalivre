@@ -7,14 +7,15 @@ FROM node:22-alpine
 # Install ONLY the critical system dependencies for Puppeteer/Chromium
 # This is the hypothesis test - if service starts and /ping works, 
 # then Railway Nixpacks was missing these libraries
+# Note: Using Alpine package names (not Ubuntu/Debian)
 RUN apk add --no-cache \
-  ca-certificates \
   chromium \
   ffmpeg \
-  libgtk-3-0 \
-  libnss3 \
-  libx11-xcb1 \
-  fonts-liberation
+  nss \
+  freetype \
+  harfbuzz \
+  ca-certificates \
+  ttf-freefont
 
 WORKDIR /app
 
