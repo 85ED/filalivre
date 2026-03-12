@@ -140,7 +140,8 @@ export default class WhatsAppController {
       const parsedBarbershopId = parseInt(barbershopId);
       console.log(`[WhatsApp.connect] ✓ barbershopId validado: ${parsedBarbershopId}`);
       
-      const data = await callWhatsAppService(`/session/start`, 'POST', { barbershopId: parsedBarbershopId });
+      // Call WhatsApp service with correct endpoint: POST /connect/:barbershopId
+      const data = await callWhatsAppService(`/connect/${parsedBarbershopId}`, 'POST');
       
       // Registra no banco de dados local
       await registerSession(parsedBarbershopId, data.qr ? 'waiting_qr' : 'connected');
@@ -192,7 +193,8 @@ export default class WhatsAppController {
 
       const parsedBarbershopId = parseInt(barbershopId);
       
-      await callWhatsAppService(`/session/stop`, 'POST', { barbershopId: parsedBarbershopId });
+      // Call WhatsApp service with correct endpoint: POST /disconnect/:barbershopId
+      await callWhatsAppService(`/disconnect/${parsedBarbershopId}`, 'POST');
       
       // Registra desconexão no banco
       await registerSession(parsedBarbershopId, 'disconnected');
@@ -226,15 +228,16 @@ export default class WhatsAppController {
       const parsedBarbershopId = parseInt(barbershopId);
       console.log(`[WhatsApp.status] ✓ barbershopId validado: ${parsedBarbershopId}`);
       
-      const data = await callWhatsAppService(`/session/status?barbershopId=${parsedBarbershopId}`, 'GET');
+      // Call WhatsApp service with correct endpoint: GET /status/:barbershopId
+      const data = await callWhatsAppService(`/status/${parsedBarbershopId}`, 'GET');
       const dbSession = await getSessionFromDB(parsedBarbershopId);
 
-      console.log(`[WhatsApp.status] ✓ Status obtido - active: ${data.isActive}, dbSession:`, dbSession?.status);
+      console.log(`[WhatsApp.status] ✓ Status obtido - active: ${data.active}, dbSession:`, dbSession?.status);
 
       res.json({
         session: `barbershop_${parsedBarbershopId}`,
-        active: data.isActive || false,
-        status: data.isActive ? 'connected' : (dbSession?.status || 'disconnected'),
+        active: data.active || false,
+        status: data.active ? 'connected' : (dbSession?.status || 'disconnected'),
         qr: data.qr || null,
       });
     } catch (err) {
@@ -259,7 +262,8 @@ export default class WhatsAppController {
 
       const parsedBarbershopId = parseInt(barbershopId);
       
-      const data = await callWhatsAppService(`/session/qr?barbershopId=${parsedBarbershopId}`, 'GET');
+      // Call WhatsApp service with correct endpoint: GET /qr/:barbershopId
+      const data = await callWhatsAppService(`/qr/${parsedBarbershopId}`, 'GET');
 
       console.log(`[WhatsApp.qr] ✓ QR obtido para barbearia ${parsedBarbershopId}`);
 
