@@ -27,8 +27,14 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Respond to preflight requests immediately
-app.options('*', cors());
+// responder qualquer preflight imediatamente
+app.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  return res.sendStatus(204);
+});
 
 // Stripe webhook needs raw body — must be before express.json()
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), StripeWebhookController.handle);
