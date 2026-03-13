@@ -68,10 +68,32 @@ app.post('/connect/:barbershopId', async (req, res) => {
     const { barbershopId } = req.params;
     const sessionName = 'barbershop_' + barbershopId;
 
-    // CRITICAL: Always destroy old session before creating new one
-    if (isSessionActive(sessionName)) {
+    // CRITICAL: Fully destroy old session - close client AND browser/chromium
+    const existingSession = sessions.get(sessionName);
+    if (existingSession) {
       console.log('[WhatsApp.connect] destroying old session:', sessionName);
-      await disconnectSession(sessionName);
+      
+      // Close the wppconnect client
+      try {
+        await existingSession.close();
+        console.log('[WhatsApp.connect] client closed');
+      } catch (e) {
+        console.log('[WhatsApp.connect] error closing client:', e.message);
+      }
+      
+      // Close the browser/chromium to free the userDataDir
+      try {
+        if (existingSession.browser) {
+          await existingSession.browser.close();
+          console.log('[WhatsApp.connect] browser closed');
+        }
+      } catch (e) {
+        console.log('[WhatsApp.connect] error closing browser:', e.message);
+      }
+      
+      // Remove from memory
+      sessions.delete(sessionName);
+      console.log('[WhatsApp.connect] session removed from memory');
     }
 
     console.log('[WhatsApp.connect] creating new session:', sessionName);

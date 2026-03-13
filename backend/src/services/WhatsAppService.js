@@ -149,11 +149,24 @@ export async function disconnectSession(sessionName) {
   if (client) {
     try {
       await client.close();
+      console.log('[WhatsApp] Client closed:', sessionName);
     } catch (e) {
-      console.error('[WhatsApp] Erro ao fechar sessão:', e.message);
+      console.error('[WhatsApp] Error closing client:', e.message);
     }
+    
+    // Also close browser to free the userDataDir
+    try {
+      if (client.browser) {
+        await client.browser.close();
+        console.log('[WhatsApp] Browser closed:', sessionName);
+      }
+    } catch (e) {
+      console.error('[WhatsApp] Error closing browser:', e.message);
+    }
+    
     sessions.delete(sessionName);
     qrCodes.delete(sessionName);
+    console.log('[WhatsApp] Session removed from memory:', sessionName);
   }
 }
 
