@@ -85,14 +85,47 @@ async function checkQueueAlerts() {
 }
 
 async function startWorker() {
-  while (true) {
+  console.log('[Worker] Worker started');
+
+  let running = false;
+
+  const tick = async () => {
+    if (running) return;
+    running = true;
+    const startedAt = Date.now();
     try {
+      console.log('[Worker] Checking queues...');
       await checkQueueAlerts();
+      const ms = Date.now() - startedAt;
+      console.log(`[Worker] Cycle completed in ${ms}ms`);
     } catch (err) {
-      console.error('[Worker] Error:', err.message);
+      console.error('[Worker] Worker error:', err?.message || err);
+    } finally {
+      running = false;
     }
-    await new Promise(resolve => setTimeout(resolve, CHECK_INTERVAL));
-  }
+  };
+
+  // Executa imediatamente e depois entra no loop
+  await tick();
+  setInterval(tick, CHECK_INTERVAL);
 }
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[Worker] UnhandledRejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[Worker] UncaughtException:', err);
+});
+
+process.on('SIGTERM', async () => {
+  console.log('[Worker] SIGTERM received, shutting down...');
+  try {
+    await pool.end();
+  } catch (err) {
+    console.error('[Worker] Error closing DB pool:', err?.message || err);
+  }
+  process.exit(0);
+});
 
 startWorker();
