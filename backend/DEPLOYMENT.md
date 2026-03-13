@@ -176,6 +176,11 @@ NODE_ENV=production
 
 # CORS - Set to your frontend domain
 CORS_ORIGIN=https://yourdomain.com
+
+# WhatsApp (wppconnect) — persistência de sessão
+# IMPORTANTE: a sessão só persiste entre deploys se a pasta de tokens estiver em um volume persistente.
+# Em produção, o padrão do serviço WhatsApp é usar /data/tokens (se existir). Você pode sobrescrever:
+WHATSAPP_TOKENS_PATH=/data/tokens
 ```
 
 ## Nginx Configuration (Reverse Proxy)

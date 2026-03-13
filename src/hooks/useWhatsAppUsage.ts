@@ -23,6 +23,11 @@ export interface BuyCreditsResponse {
   };
 }
 
+interface UsageApiResponse {
+  success: boolean;
+  data: WhatsAppUsageStats;
+}
+
 export function useWhatsAppUsage() {
   const [stats, setStats] = useState<WhatsAppUsageStats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -30,28 +35,40 @@ export function useWhatsAppUsage() {
   const [buyingCredits, setBuyingCredits] = useState(false);
 
   // Fetch usage stats
-  const fetchUsage = useCallback(async () => {
+  const fetchUsage = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
-      setError(null);
-      const response = await api.get<{ success: boolean; data: WhatsAppUsageStats }>(
-        '/whatsapp/usage'
-      );
+      if (!silent) {
+        setLoading(true);
+        setError(null);
+      }
+      const response = await api.get<UsageApiResponse>('/whatsapp/usage');
       setStats(response.data);
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to fetch usage'));
+      if (!silent) {
+        setError(err instanceof Error ? err : new Error('Failed to fetch usage'));
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, []);
 
   // Auto-fetch on mount
   useEffect(() => {
-    fetchUsage();
+    fetchUsage(false);
+  }, [fetchUsage]);
+
+  // Polling leve para manter o contador “em tempo real” no dashboard
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      fetchUsage(true);
+    }, 15000);
+    return () => window.clearInterval(id);
   }, [fetchUsage]);
 
   // Buy credits
-  const buyCredits = useCallback(async (packageQuantity: '100' | '300' | '1000') => {
+  const buyCredits = useCallback(async (packageQuantity: '100' | '250' | '700') => {
     try {
       setBuyingCredits(true);
       setError(null);
@@ -60,14 +77,14 @@ export function useWhatsAppUsage() {
       });
 
       // Redirecionar para Stripe Checkout
-      if (response.data.url) {
+      if (response.data?.url) {
         // Usar setTimeout para garantir que a transação foi iniciada
         setTimeout(() => {
           window.location.href = response.data.url;
         }, 500);
       }
 
-      return response.data;
+      return response;
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to buy credits');
       setError(error);
@@ -82,7 +99,7 @@ export function useWhatsAppUsage() {
     loading,
     error,
     buyingCredits,
-    refetch: fetchUsage,
+    refetch: () => fetchUsage(false),
     buyCredits,
   };
 }

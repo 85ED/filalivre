@@ -20,16 +20,16 @@ export const WHATSAPP_CREDIT_PACKAGES = [
     currency: 'brl',
   },
   {
-    quantity: '300',
-    name: '300 Notificações',
-    description: '~3 semanas de uso (45 notificações/dia)',
+    quantity: '250',
+    name: '250 Notificações',
+    description: '~3 semanas de uso (35 notificações/dia)',
     price: 2000, // R$20 em centavos
     currency: 'brl',
   },
   {
-    quantity: '1000',
-    name: '1000 Notificações',
-    description: '~2 meses de uso (150 notificações/dia)',
+    quantity: '700',
+    name: '700 Notificações',
+    description: '~2 meses de uso (90 notificações/dia)',
     price: 5000, // R$50 em centavos
     currency: 'brl',
   },

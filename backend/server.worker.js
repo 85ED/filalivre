@@ -135,19 +135,8 @@ async function checkQueueAlerts() {
         );
       } catch (err) {
         errorCount++;
-        console.error(`[Worker] Erro ao enviar WhatsApp para ${client.name}:`, err.message);
-
-        // Se falhar o envio, desfaz o claim para tentar novamente no próximo ciclo
-        try {
-          await pool.query(
-            `UPDATE queue
-             SET alert_sent = false
-             WHERE id = ?`,
-            [client.id]
-          );
-        } catch (rollbackErr) {
-          console.error('[Worker] Erro ao desfazer claim (alert_sent):', rollbackErr?.message || rollbackErr);
-        }
+        console.error(`[Worker] Erro ao enviar WhatsApp para ${client.name}:`, err);
+        // Regra: não retentar no próximo ciclo. O alerta é informativo e já foi "claimado".
       }
     }
 

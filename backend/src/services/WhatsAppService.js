@@ -1,6 +1,7 @@
 import wppconnect from '@wppconnect-team/wppconnect';
 import pool from '../config/database.js';
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
+import { resolve } from 'path';
 
 const sessions = new Map();
 // Armazena último QR gerado por sessão (acessível pelo controller)
@@ -10,8 +11,37 @@ const startingSessions = new Map();
 
 // TokenStore em disco (essencial para restaurar após restart do container)
 // OBS: em redeploy (container novo), isso só persiste se o disco persistir.
+function getPreferredTokensPath() {
+  if (process.env.WHATSAPP_TOKENS_PATH) return process.env.WHATSAPP_TOKENS_PATH;
+  if (process.env.DATA_DIR) return `${process.env.DATA_DIR}/tokens`;
+  if (process.env.NODE_ENV === 'production') return '/data/tokens';
+  return './tokens';
+}
+
+function ensureWritableDir(dirPath) {
+  try {
+    mkdirSync(dirPath, { recursive: true });
+    return dirPath;
+  } catch (err) {
+    console.warn('[WhatsApp] [WARN] Não foi possível criar pasta de tokens:', dirPath, err?.message || err);
+    return null;
+  }
+}
+
+const preferredTokensPathRaw = getPreferredTokensPath();
+const preferredTokensPath = preferredTokensPathRaw.startsWith('/')
+  ? preferredTokensPathRaw
+  : resolve(preferredTokensPathRaw);
+
+const effectiveTokensPath =
+  ensureWritableDir(preferredTokensPath) ||
+  ensureWritableDir(resolve('./tokens')) ||
+  preferredTokensPath;
+
+console.log('[WhatsApp] TokenStore path:', effectiveTokensPath);
+
 const fileTokenStore = new wppconnect.tokenStore.FileTokenStore({
-  path: './tokens',
+  path: effectiveTokensPath,
 });
 
 // Evita gravar status repetidamente no banco a cada callback

@@ -123,11 +123,10 @@ export function WhatsAppUsageCard({ onBuyCreditsClick }: WhatsAppUsageCardProps)
         {(stats.percentage >= 70 || !stats.can_send) && (
           <Button
             onClick={onBuyCreditsClick}
-            disabled={!stats.can_send}
             className="w-full"
             variant={!stats.can_send ? 'destructive' : stats.percentage >= 80 ? 'default' : 'outline'}
           >
-            {!stats.can_send ? '⚠️ Limite atingido - Comprar créditos' : '📱 Comprar créditos adicionais'}
+            {!stats.can_send ? 'Limite atingido — Comprar créditos' : 'Comprar créditos adicionais'}
           </Button>
         )}
       </CardContent>

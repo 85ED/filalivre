@@ -15,17 +15,17 @@ export const CREDIT_PACKAGES = [
     recommended: false,
   },
   {
-    quantity: '300',
-    name: '300 Notificações',
-    description: '~3 semanas de uso (45 notificações/dia)',
+    quantity: '250',
+    name: '250 Notificações',
+    description: '~3 semanas de uso (35 notificações/dia)',
     price: 20.00,
     priceFormatted: 'R$ 20,00',
     recommended: true,
   },
   {
-    quantity: '1000',
-    name: '1000 Notificações',
-    description: '~2 meses de uso (150 notificações/dia)',
+    quantity: '700',
+    name: '700 Notificações',
+    description: '~2 meses de uso (90 notificações/dia)',
     price: 50.00,
     priceFormatted: 'R$ 50,00',
     recommended: false,
@@ -38,7 +38,7 @@ interface BuyCreditsModalProps {
 }
 
 export function BuyCreditsModal({ open, onOpenChange }: BuyCreditsModalProps) {
-  const [selectedPackage, setSelectedPackage] = useState<'100' | '300' | '1000'>('300');
+  const [selectedPackage, setSelectedPackage] = useState<'100' | '250' | '700'>('250');
   const [isProcessing, setIsProcessing] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -53,7 +53,7 @@ export function BuyCreditsModal({ open, onOpenChange }: BuyCreditsModalProps) {
       setErrorMessage(null);
       setSuccess(false);
 
-      await buyCredits(selectedPackage as '100' | '300' | '1000');
+      await buyCredits(selectedPackage as '100' | '250' | '700');
 
       // Sucesso - mostrar mensagem
       setSuccess(true);
@@ -62,7 +62,7 @@ export function BuyCreditsModal({ open, onOpenChange }: BuyCreditsModalProps) {
       setTimeout(() => {
         onOpenChange(false);
         setSuccess(false);
-        setSelectedPackage('300');
+        setSelectedPackage('250');
       }, 2000);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao processar compra';
@@ -112,7 +112,7 @@ export function BuyCreditsModal({ open, onOpenChange }: BuyCreditsModalProps) {
               {CREDIT_PACKAGES.map((pkg) => (
                 <button
                   key={pkg.quantity}
-                  onClick={() => setSelectedPackage(pkg.quantity as '100' | '300' | '1000')}
+                  onClick={() => setSelectedPackage(pkg.quantity as '100' | '250' | '700')}
                   className={`w-full rounded-lg border-2 p-4 text-left transition-all ${
                     selectedPackage === pkg.quantity
                       ? 'border-blue-500 bg-blue-50'

@@ -11,6 +11,7 @@ import {
   registerSession,
   getSessionFromDB,
 } from './src/services/WhatsAppService.js';
+import WhatsAppUsageService from './src/services/WhatsAppUsageService.js';
 
 const app = express();
 const PORT = process.env.WHATSAPP_PORT || 3003;
@@ -62,8 +63,18 @@ app.post('/send', async (req, res) => {
   try {
     const { barbershopId, session, phone, message } = req.body;
     const sessionName = session || (barbershopId ? 'barbershop_' + barbershopId : null);
-    if (!sessionName || !phone || !message) {
-      return res.status(400).json({ error: 'session (ou barbershopId), phone e message são obrigatórios' });
+    const parsedBarbershopId = barbershopId ? parseInt(barbershopId) : null;
+    if (!sessionName || !phone || !message || !parsedBarbershopId || Number.isNaN(parsedBarbershopId)) {
+      return res.status(400).json({ error: 'barbershopId, phone e message são obrigatórios' });
+    }
+
+    // Bloqueia envio ao atingir limite mensal (500 + créditos extras)
+    const canSend = await WhatsAppUsageService.canSendMessage(parsedBarbershopId);
+    if (!canSend) {
+      return res.status(429).json({
+        error: 'Limite mensal de notificações WhatsApp atingido. Compre créditos para continuar enviando.',
+        code: 'WHATSAPP_LIMIT_REACHED',
+      });
     }
 
     // Mesma regra do /status: se existe no Map de sessões, consideramos ativa
@@ -93,6 +104,13 @@ app.post('/send', async (req, res) => {
       } else {
         throw err;
       }
+    }
+
+    // Incrementa SOMENTE se enviou de fato
+    try {
+      await WhatsAppUsageService.incrementUsage(parsedBarbershopId);
+    } catch (usageErr) {
+      console.error('[WhatsApp] Falha ao incrementar uso (não bloqueante):', usageErr?.message || usageErr);
     }
     res.json({ success: true, message: 'Mensagem enviada' });
   } catch (err) {

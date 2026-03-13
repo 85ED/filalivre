@@ -191,16 +191,16 @@ export class WhatsAppUsageService {
         description: '100 notificações WhatsApp',
       },
       {
-        quantity: 300,
+        quantity: 250,
         price: 20.00,
         priceFormatted: 'R$ 20,00',
-        description: '300 notificações WhatsApp',
+        description: '250 notificações WhatsApp',
       },
       {
-        quantity: 1000,
+        quantity: 700,
         price: 50.00,
         priceFormatted: 'R$ 50,00',
-        description: '1000 notificações WhatsApp',
+        description: '700 notificações WhatsApp',
       },
     ];
 

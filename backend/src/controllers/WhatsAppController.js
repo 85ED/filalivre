@@ -414,7 +414,7 @@ export default class WhatsAppController {
 
       if (!packageName) {
         return res.status(400).json({
-          error: 'package is required (100, 300, or 1000)',
+          error: 'package is required (100, 250, or 700)',
         });
       }
 

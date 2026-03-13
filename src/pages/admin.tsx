@@ -486,7 +486,7 @@ export function AdminPage() {
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all border h-8 flex-shrink-0 ${
                 waStatus === 'connected'
                   ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                  : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'
+                  : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50 animate-pulse'
               }`}
             >
               <MessageCircle className="w-3.5 h-3.5" />

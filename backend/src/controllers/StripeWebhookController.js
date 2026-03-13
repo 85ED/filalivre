@@ -1,6 +1,7 @@
 import StripeService from '../services/StripeService.js';
 import Barbershop from '../models/Barbershop.js';
 import pool from '../config/database.js';
+import WhatsAppUsageService from '../services/WhatsAppUsageService.js';
 
 export class StripeWebhookController {
   static async handle(req, res) {
@@ -87,7 +88,11 @@ async function handleWhatsAppCreditsPurchase(session) {
 
     // Verificar se já foi processado
     const [existing] = await pool.query(
-      'SELECT id FROM whatsapp_credits_log WHERE session_id = ?',
+      `SELECT id
+       FROM whatsapp_credits_log
+       WHERE stripe_transaction_id = ?
+         AND tipo_movimento = 'compra'
+       LIMIT 1`,
       [sessionId]
     );
 
@@ -96,42 +101,11 @@ async function handleWhatsAppCreditsPurchase(session) {
       return;
     }
 
-    // Iniciar transação
-    const connection = await pool.getConnection();
-    try {
-      await connection.beginTransaction();
+    await WhatsAppUsageService.addCredits(barbershopId, packageQuantity, sessionId);
 
-      // Adicionar créditos extra
-      const [updateResult] = await connection.query(
-        `UPDATE whatsapp_usage 
-         SET creditos_extra = creditos_extra + ? 
-         WHERE barbershop_id = ?`,
-        [packageQuantity, barbershopId]
-      );
-
-      if (updateResult.affectedRows === 0) {
-        throw new Error(`No whatsapp_usage record found for barbershop ${barbershopId}`);
-      }
-
-      // Registrar transação no log de auditoria
-      await connection.query(
-        `INSERT INTO whatsapp_credits_log 
-         (barbershop_id, amount, transaction_type, description, session_id, created_at)
-         VALUES (?, ?, 'purchase', 'WhatsApp credits purchase via Stripe', ?, NOW())`,
-        [barbershopId, packageQuantity, sessionId]
-      );
-
-      await connection.commit();
-      console.log(
-        `[Stripe Webhook] Successfully added ${packageQuantity} WhatsApp credits to barbershop ${barbershopId}`
-      );
-    } catch (error) {
-      await connection.rollback();
-      console.error('[Stripe Webhook] Error crediting WhatsApp credits:', error);
-      throw error;
-    } finally {
-      connection.release();
-    }
+    console.log(
+      `[Stripe Webhook] Successfully added ${packageQuantity} WhatsApp credits to barbershop ${barbershopId}`
+    );
   } catch (error) {
     console.error('[Stripe Webhook] handleWhatsAppCreditsPurchase error:', error);
     throw error;
