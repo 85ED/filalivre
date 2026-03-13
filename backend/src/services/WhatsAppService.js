@@ -133,7 +133,6 @@ export async function startAllSessions() {
     console.error('[WhatsApp] Error loading sessions from database:', err.message);
   }
 }
-}
 
 export function getSession(sessionName) {
   return sessions.get(sessionName) || null;
