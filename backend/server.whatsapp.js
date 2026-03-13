@@ -68,48 +68,31 @@ app.post('/connect/:barbershopId', async (req, res) => {
     const { barbershopId } = req.params;
     const sessionName = 'barbershop_' + barbershopId;
 
-    // CRITICAL: Fully destroy old session - close client AND browser/chromium
-    const existingSession = sessions.get(sessionName);
-    if (existingSession) {
-      console.log('[WhatsApp.connect] destroying old session:', sessionName);
-      
-      // Close the wppconnect client
-      try {
-        await existingSession.close();
-        console.log('[WhatsApp.connect] client closed');
-      } catch (e) {
-        console.log('[WhatsApp.connect] error closing client:', e.message);
-      }
-      
-      // Close the browser/chromium to free the userDataDir
-      try {
-        if (existingSession.browser) {
-          await existingSession.browser.close();
-          console.log('[WhatsApp.connect] browser closed');
-        }
-      } catch (e) {
-        console.log('[WhatsApp.connect] error closing browser:', e.message);
-      }
-      
-      // Remove from memory
-      sessions.delete(sessionName);
-      console.log('[WhatsApp.connect] session removed from memory');
+    console.log('[WhatsApp.connect] restarting session:', sessionName);
+
+    // Disconnect old session if exists (handles cleanup of client + browser)
+    try {
+      await disconnectSession(sessionName);
+      console.log('[WhatsApp.connect] old session destroyed');
+    } catch (e) {
+      console.log('[WhatsApp.connect] no previous session, creating new');
     }
 
+    // Create fresh session
     console.log('[WhatsApp.connect] creating new session:', sessionName);
     const { qr } = await startSession(sessionName);
     
     console.log('[WhatsApp.connect] QR generated:', qr ? 'yes' : 'no');
     await registerSession(barbershopId, qr ? 'waiting_qr' : 'connected');
 
-    res.json({
+    return res.json({
       success: true,
       status: qr ? 'waiting_qr' : 'connected',
       qr: qr || null,
     });
   } catch (err) {
-    console.error('[WhatsApp] Erro ao conectar:', err.message);
-    res.status(500).json({ error: 'Erro ao iniciar sessão WhatsApp' });
+    console.error('[WhatsApp.connect] erro:', err.message);
+    return res.status(500).json({ error: 'Erro ao iniciar sessão WhatsApp' });
   }
 });
 
