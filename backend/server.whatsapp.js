@@ -130,13 +130,11 @@ app.get('/status/:barbershopId', async (req, res) => {
   try {
     const { barbershopId } = req.params;
     const sessionName = 'barbershop_' + barbershopId;
-    const created = isSessionActive(sessionName);
-    const active = created ? await isSessionReady(sessionName) : false;
+    const active = isSessionActive(sessionName);
     const dbSession = await getSessionFromDB(barbershopId);
 
     res.json({
       session: sessionName,
-      created,
       active,
       status: active ? 'connected' : (dbSession?.status || 'disconnected'),
       qr: active ? null : getLastQR(sessionName),
