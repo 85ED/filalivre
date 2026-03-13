@@ -170,7 +170,12 @@ export function AdminPage() {
         setWaQr(null);
       } else {
         setWaStatus(data.status as typeof waStatus || 'disconnected');
-        if (data.qr) setWaQr(data.qr);
+        // Only show QR if status is waiting_qr and data contains qr
+        if (data.status === 'waiting_qr' && data.qr) {
+          setWaQr(data.qr);
+        } else {
+          setWaQr(null);
+        }
       }
     } catch {
       // ignore

@@ -68,11 +68,16 @@ app.post('/connect/:barbershopId', async (req, res) => {
     const { barbershopId } = req.params;
     const sessionName = 'barbershop_' + barbershopId;
 
+    // CRITICAL: Always destroy old session before creating new one
     if (isSessionActive(sessionName)) {
-      return res.json({ success: true, status: 'connected', qr: null });
+      console.log('[WhatsApp.connect] destroying old session:', sessionName);
+      await disconnectSession(sessionName);
     }
 
+    console.log('[WhatsApp.connect] creating new session:', sessionName);
     const { qr } = await startSession(sessionName);
+    
+    console.log('[WhatsApp.connect] QR generated:', qr ? 'yes' : 'no');
     await registerSession(barbershopId, qr ? 'waiting_qr' : 'connected');
 
     res.json({
@@ -112,7 +117,7 @@ app.get('/status/:barbershopId', async (req, res) => {
       session: sessionName,
       active,
       status: active ? 'connected' : (dbSession?.status || 'disconnected'),
-      qr: active ? null : getLastQR(sessionName),
+      qr: null,  // NEVER return QR from status endpoint - only from /connect endpoint
     });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao verificar status' });
