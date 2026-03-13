@@ -126,6 +126,69 @@ async function callWhatsAppService(endpoint, method = 'POST', body = null) {
 }
 
 export default class WhatsAppController {
+  /**
+   * POST /api/whatsapp/start/:barbershopId
+   * Inicia sessão WhatsApp (alias para /connect)
+   * Chama WhatsApp service para gerar QR code
+   * Registra sessão no banco de dados
+   */
+  static async start(req, res) {
+    try {
+      const { barbershopId } = req.params;
+
+      console.log(`[WhatsApp.start] INICIANDO - barbershopId: ${barbershopId}`);
+
+      if (!barbershopId || barbershopId === '0' || isNaN(parseInt(barbershopId))) {
+        console.error(`[WhatsApp.start] ❌ barbershopId INVÁLIDO: "${barbershopId}"`);
+        return res.status(400).json({ error: 'barbershopId deve ser um número válido e diferente de 0' });
+      }
+
+      const parsedBarbershopId = parseInt(barbershopId);
+      console.log(`[WhatsApp.start] ✓ barbershopId validado: ${parsedBarbershopId}`);
+      
+      // Call WhatsApp service with endpoint: POST /connect/:barbershopId
+      const data = await callWhatsAppService(`/connect/${parsedBarbershopId}`, 'POST');
+      
+      // Registra no banco de dados
+      const sessionName = `barbershop_${parsedBarbershopId}`;
+      await registerSession(parsedBarbershopId, data.qr ? 'waiting_qr' : 'starting');
+      console.log(`[WhatsApp.start] ✓ Sessão ${sessionName} registrada no banco com status: ${data.qr ? 'waiting_qr' : 'starting'}`);
+
+      res.json({
+        success: true,
+        session: sessionName,
+        message: data.qr ? 'QR gerado. Escaneie com seu celular para conectar.' : 'Sessão iniciada.',
+        status: data.qr ? 'waiting_qr' : 'starting',
+        qr: data.qr || null,
+      });
+    } catch (err) {
+      console.error('[WhatsApp.start] ❌ Erro:', err.message);
+      
+      // Tenta enviar email de alerta para o dono da barbearia
+      try {
+        const [[owner]] = await pool.query(
+          'SELECT u.email, b.name FROM users u JOIN barbershops b ON u.barbershop_id = b.id WHERE b.id = ? AND u.role = ?',
+          [req.params.barbershopId, 'owner']
+        );
+        if (owner && owner.email) {
+          await sendWhatsAppAlertEmail(
+            owner.email,
+            owner.name,
+            'error'
+          );
+        }
+      } catch (emailErr) {
+        console.error('[WhatsApp] Erro ao enviar alerta por email:', emailErr.message);
+      }
+      
+      res.status(500).json({ 
+        success: false,
+        error: 'Falha ao iniciar sessão WhatsApp',
+        details: err.message 
+      });
+    }
+  }
+
   static async connect(req, res) {
     try {
       const { barbershopId } = req.params;

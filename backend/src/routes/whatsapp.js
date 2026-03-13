@@ -4,6 +4,8 @@ import WhatsAppController from '../controllers/WhatsAppController.js';
 
 const router = express.Router();
 
+// Session management endpoints
+router.post('/start/:barbershopId', WhatsAppController.start);
 router.post('/connect/:barbershopId', WhatsAppController.connect);
 router.post('/disconnect/:barbershopId', WhatsAppController.disconnect);
 router.get('/status/:barbershopId', WhatsAppController.status);
