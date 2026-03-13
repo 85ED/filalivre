@@ -297,6 +297,21 @@ export default class WhatsAppController {
 
       console.log(`[WhatsApp.status] ✓ Status obtido - active: ${data.active}, dbSession:`, dbSession?.status);
 
+      // Update status in database if active and not already marked as connected
+      if (data.active === true && dbSession?.status !== 'connected') {
+        try {
+          await pool.query(`
+            UPDATE whatsapp_sessions
+            SET status = 'connected', updated_at = NOW()
+            WHERE barbershop_id = ?
+          `, [parsedBarbershopId]);
+          console.log(`[WhatsApp.status] ✓ Status no banco atualizado para 'connected'`);
+        } catch (updateErr) {
+          console.error(`[WhatsApp.status] ⚠️ Erro ao atualizar status no banco:`, updateErr.message);
+          // Não quebra a resposta, apenas loga o erro
+        }
+      }
+
       res.json({
         session: `barbershop_${parsedBarbershopId}`,
         active: data.active || false,
