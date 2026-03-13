@@ -38,9 +38,10 @@ function getChromiumPath() {
 }
 
 export async function startSession(sessionName) {
-  // Se já existe sessão ativa, retorna ela
+  // Se já existe sessão ativa, destroi antes de criar nova
   if (sessions.has(sessionName)) {
-    return { client: sessions.get(sessionName), qr: null };
+    console.log('[WhatsApp] Session already exists, destroying old one:', sessionName);
+    await disconnectSession(sessionName);
   }
 
   // Cria promise que resolve quando o QR é gerado ou a sessão conecta
@@ -70,6 +71,7 @@ export async function startSession(sessionName) {
     },
     headless: true,
     logQR: true,
+    autoClose: 0,  // CRÍTICO: não fechar sessão automaticamente
     // CRÍTICO: Sempre passar browserPathExecutable, não deixar undefined
     browserPathExecutable: chromiumPath,
     browserArgs: [
@@ -146,28 +148,30 @@ export function isSessionActive(sessionName) {
 
 export async function disconnectSession(sessionName) {
   const client = sessions.get(sessionName);
-  if (client) {
-    try {
-      await client.close();
-      console.log('[WhatsApp] Client closed:', sessionName);
-    } catch (e) {
-      console.error('[WhatsApp] Error closing client:', e.message);
-    }
-    
-    // Also close browser to free the userDataDir
-    try {
-      if (client.browser) {
-        await client.browser.close();
-        console.log('[WhatsApp] Browser closed:', sessionName);
-      }
-    } catch (e) {
-      console.error('[WhatsApp] Error closing browser:', e.message);
-    }
-    
-    sessions.delete(sessionName);
-    qrCodes.delete(sessionName);
-    console.log('[WhatsApp] Session removed from memory:', sessionName);
+  if (!client) return;
+
+  // Close the client
+  try {
+    await client.close();
+    console.log('[WhatsApp] Client closed:', sessionName);
+  } catch (e) {
+    // Silently ignore errors
   }
+
+  // Close the browser to free userDataDir (CRITICAL)
+  try {
+    if (client.browser) {
+      await client.browser.close();
+      console.log('[WhatsApp] Browser closed:', sessionName);
+    }
+  } catch (e) {
+    // Silently ignore errors
+  }
+
+  // Remove from memory
+  sessions.delete(sessionName);
+  qrCodes.delete(sessionName);
+  console.log('[WhatsApp] Session removed from memory:', sessionName);
 }
 
 // Salva/atualiza sessão no banco de dados
