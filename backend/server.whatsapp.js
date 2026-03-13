@@ -89,14 +89,26 @@ app.post('/connect/:barbershopId', async (req, res) => {
     // Criar sessão nova
     console.log('[WhatsApp.connect] Criando nova sessão...');
     const { qr } = await startSession(sessionName);
-    
-    if (!qr) {
-      console.error('[WhatsApp.connect] ❌ QR não foi gerado!');
+
+    // Em alguns cenários o QR é emitido de forma assíncrona (logs mostram),
+    // mas a promise retorna qr=null (ex: sessão já iniciada/restore). Então aguardamos um pouco.
+    let finalQr = qr || getLastQR(sessionName);
+    if (!finalQr) {
+      const startedAt = Date.now();
+      const maxWaitMs = 12000;
+      while (!finalQr && Date.now() - startedAt < maxWaitMs) {
+        await new Promise((r) => setTimeout(r, 250));
+        finalQr = getLastQR(sessionName);
+      }
+    }
+
+    if (!finalQr) {
+      console.error('[WhatsApp.connect] ❌ QR não foi gerado (timeout aguardando catchQR)');
       return res.status(500).json({ error: 'QR não foi gerado' });
     }
 
     console.log('[WhatsApp.connect] ✓ QR gerado com sucesso');
-    console.log('[WhatsApp.connect] QR (primeiros 50 chars):', qr.substring(0, 50) + '...');
+    console.log('[WhatsApp.connect] QR (primeiros 50 chars):', finalQr.substring(0, 50) + '...');
     
     // Registrar no banco
     await registerSession(barbershopId, 'waiting_qr');
@@ -106,7 +118,7 @@ app.post('/connect/:barbershopId', async (req, res) => {
     return res.json({
       success: true,
       status: 'waiting_qr',
-      qr: qr,
+      qr: finalQr,
     });
 
   } catch (err) {
