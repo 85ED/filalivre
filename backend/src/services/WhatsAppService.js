@@ -91,33 +91,48 @@ export async function startSession(sessionName) {
 }
 
 export async function startAllSessions() {
+  console.log('[WhatsApp] Starting all sessions from database...');
+  
   try {
-    console.log("[WhatsApp] [DEBUG] startAllSessions: Iniciando...");
     const [rows] = await pool.query(`
       SELECT barbershop_id
       FROM whatsapp_sessions
       WHERE status = 'connected'
     `);
 
-    console.log(`[WhatsApp] [DEBUG] Encontradas ${rows.length} sessões no banco`);
-    console.log(`[WhatsApp] Iniciando ${rows.length} sessões do banco de dados...`);
+    console.log(`[WhatsApp] Found ${rows.length} sessions in database`);
 
     for (const row of rows) {
-      const sessionName = "barbershop_" + row.barbershop_id;
+      const sessionName = `barbershop_${row.barbershop_id}`;
+      
       try {
-        console.log(`[WhatsApp] [DEBUG] Iniciando sessão: ${sessionName}`);
+        console.log(`[WhatsApp] Restoring session: ${sessionName}`);
         await startSession(sessionName);
-        console.log(`[WhatsApp] Sessão iniciada: ${sessionName}`);
+        console.log(`[WhatsApp] Session restored successfully: ${sessionName}`);
       } catch (err) {
-        console.error(`[WhatsApp] Erro ao iniciar sessão ${sessionName}:`, err.message);
+        console.error(`[WhatsApp] Failed to restore ${sessionName}:`, err.message);
+        
+        // Try force clean if there's an error
+        try {
+          await forceCleanSession(sessionName);
+        } catch (cleanErr) {
+          console.error(`[WhatsApp] Failed to force clean ${sessionName}:`, cleanErr.message);
+        }
+        
+        // Update database status to disconnected
+        try {
+          await registerSession(row.barbershop_id, 'disconnected');
+        } catch (dbErr) {
+          console.error(`[WhatsApp] Failed to update status in DB for ${sessionName}:`, dbErr.message);
+        }
       }
     }
 
-    console.log("[WhatsApp] [DEBUG] startAllSessions: Concluído com sucesso");
-    console.log("[WhatsApp] Todas as sessões foram inicializadas");
+    console.log('[WhatsApp] All sessions initialization completed');
   } catch (err) {
-    console.error("[WhatsApp] Erro ao carregar sessões do banco:", err.message);
+    console.error('[WhatsApp] Error loading sessions from database:', err.message);
   }
+}
 }
 
 export function getSession(sessionName) {
@@ -147,31 +162,47 @@ export function isSessionActive(sessionName) {
 }
 
 export async function disconnectSession(sessionName) {
+  console.log(`[WhatsApp] Disconnecting session: ${sessionName}`);
+  
   const client = sessions.get(sessionName);
-  if (!client) return;
-
-  // Close the client
-  try {
-    await client.close();
-    console.log('[WhatsApp] Client closed:', sessionName);
-  } catch (e) {
-    // Silently ignore errors
+  if (!client) {
+    console.log(`[WhatsApp] Session ${sessionName} not found in memory`);
+    return;
   }
 
-  // Close the browser to free userDataDir (CRITICAL)
   try {
-    if (client.browser) {
-      await client.browser.close();
-      console.log('[WhatsApp] Browser closed:', sessionName);
+    // 1. Fecha o cliente WhatsApp
+    try {
+      await client.close();
+      console.log(`[WhatsApp] Client closed for ${sessionName}`);
+    } catch (e) {
+      console.log(`[WhatsApp] Error closing client (usually safe): ${e.message}`);
     }
-  } catch (e) {
-    // Silently ignore errors
+    
+    // 2. Fecha o browser explicitamente (ISSO É CRÍTICO!)
+    try {
+      if (client.browser) {
+        console.log(`[WhatsApp] Closing browser for ${sessionName}`);
+        await client.browser.close();
+        console.log(`[WhatsApp] Browser closed successfully for ${sessionName}`);
+      }
+    } catch (e) {
+      console.log(`[WhatsApp] Error closing browser (continuing anyway): ${e.message}`);
+    }
+    
+    // 3. Remove da memória (SEMPRE, mesmo com erro)
+    sessions.delete(sessionName);
+    
+    // 4. Limpa QR code
+    qrCodes.delete(sessionName);
+    
+    console.log(`[WhatsApp] Session ${sessionName} disconnected successfully`);
+  } catch (error) {
+    console.error(`[WhatsApp] Unexpected error disconnecting ${sessionName}:`, error.message);
+    // Mesmo com erro, tenta remover da memória para evitar locks
+    sessions.delete(sessionName);
+    qrCodes.delete(sessionName);
   }
-
-  // Remove from memory
-  sessions.delete(sessionName);
-  qrCodes.delete(sessionName);
-  console.log('[WhatsApp] Session removed from memory:', sessionName);
 }
 
 // Salva/atualiza sessão no banco de dados
@@ -192,4 +223,36 @@ export async function getSessionFromDB(barbershopId) {
     [barbershopId]
   );
   return rows[0] || null;
+}
+
+// Helper function: Force clean a session (useful for emergency cleanup)
+export async function forceCleanSession(sessionName) {
+  console.log(`[WhatsApp] Force cleaning session: ${sessionName}`);
+  
+  try {
+    // Mata o browser se existir (força hard close)
+    const client = sessions.get(sessionName);
+    if (client?.browser) {
+      try {
+        await client.browser.close();
+        console.log(`[WhatsApp] Browser force-closed for ${sessionName}`);
+      } catch (e) {
+        console.log(`[WhatsApp] Browser already closed or error: ${e.message}`);
+      }
+    }
+    
+    // Remove da memória
+    sessions.delete(sessionName);
+    qrCodes.delete(sessionName);
+    
+    // Atualiza status no banco como desconectado
+    const barbershopId = sessionName.replace('barbershop_', '');
+    if (barbershopId && !isNaN(barbershopId)) {
+      await registerSession(parseInt(barbershopId), 'disconnected');
+    }
+    
+    console.log(`[WhatsApp] Session ${sessionName} force cleaned successfully`);
+  } catch (error) {
+    console.error(`[WhatsApp] Error force cleaning ${sessionName}:`, error.message);
+  }
 }
