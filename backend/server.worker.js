@@ -107,17 +107,30 @@ async function checkQueueAlerts() {
         continue;
       }
 
+      // Claim atômico para evitar múltiplos envios em paralelo (ex.: 2 workers/2 pods)
+      // Só 1 worker conseguirá marcar alert_sent=true para este id.
+      const [claim] = await pool.query(
+        `UPDATE queue
+         SET alert_sent = true
+         WHERE id = ?
+           AND status = 'waiting'
+           AND (alert_sent = false OR alert_sent IS NULL)`,
+        [client.id]
+      );
+
+      if (!claim?.affectedRows) {
+        if (DEBUG) {
+          console.log(`[Worker] Skip: already claimed/sent (id=${client.id})`);
+        }
+        continue;
+      }
+
       try {
         const message = peopleAhead === 0
           ? `Olá ${client.name}! Você é o próximo. Dirija-se ao atendimento.`
           : `Olá ${client.name}! Faltam apenas ${peopleAhead} pessoa${peopleAhead > 1 ? 's' : ''} para sua vez. Prepare-se!`;
 
         await sendWhatsAppMessage(client.barbershop_id, client.phone, message);
-
-        await pool.query(
-          'UPDATE queue SET alert_sent = true WHERE id = ?',
-          [client.id]
-        );
 
         sentCount++;
         console.log(
@@ -126,6 +139,18 @@ async function checkQueueAlerts() {
       } catch (err) {
         errorCount++;
         console.error(`[Worker] Erro ao enviar WhatsApp para ${client.name}:`, err.message);
+
+        // Se falhar o envio, desfaz o claim para tentar novamente no próximo ciclo
+        try {
+          await pool.query(
+            `UPDATE queue
+             SET alert_sent = false
+             WHERE id = ?`,
+            [client.id]
+          );
+        } catch (rollbackErr) {
+          console.error('[Worker] Erro ao desfazer claim (alert_sent):', rollbackErr?.message || rollbackErr);
+        }
       }
     }
 

@@ -8,6 +8,30 @@ const qrCodes = new Map();
 // Evita múltiplos starts concorrentes da mesma sessão
 const startingSessions = new Map();
 
+// Evita gravar status repetidamente no banco a cada callback
+const lastPersistedStatus = new Map();
+
+function parseBarbershopIdFromSessionName(sessionName) {
+  const m = /^barbershop_(\d+)$/.exec(String(sessionName || ''));
+  if (!m) return null;
+  const id = Number(m[1]);
+  return Number.isFinite(id) ? id : null;
+}
+
+async function persistSessionStatus(sessionName, status) {
+  const barbershopId = parseBarbershopIdFromSessionName(sessionName);
+  if (!barbershopId) return;
+
+  const key = `${sessionName}:${status}`;
+  if (lastPersistedStatus.get(sessionName) === status) return;
+  lastPersistedStatus.set(sessionName, status);
+  try {
+    await registerSession(barbershopId, status);
+  } catch (err) {
+    console.error('[WhatsApp] Erro ao persistir status no banco:', err?.message || err);
+  }
+}
+
 // Detecta Chromium do sistema (crítico para Railway/Docker)
 // DEVE ser /usr/bin/chromium em Alpine/Linux, não fallback para bundled
 function getChromiumPath() {
@@ -61,9 +85,26 @@ export async function startSession(sessionName) {
         catchQR: (base64Qr) => {
           console.log('[WhatsApp] QR Code gerado para sessão:', sessionName);
           qrCodes.set(sessionName, base64Qr);
+          // Enquanto houver QR, consideramos que está aguardando scan
+          persistSessionStatus(sessionName, 'waiting_qr');
         },
         statusFind: (statusSession) => {
           console.log('[WhatsApp] Status da sessão:', statusSession);
+
+          const normalized = String(statusSession || '').toLowerCase();
+          // Eventos comuns de sucesso de login no WPPConnect
+          if (
+            normalized.includes('qrreadsuccess') ||
+            normalized.includes('islogged') ||
+            normalized.includes('inchat') ||
+            normalized.includes('main')
+          ) {
+            persistSessionStatus(sessionName, 'connected');
+          }
+
+          if (normalized.includes('disconnected')) {
+            persistSessionStatus(sessionName, 'disconnected');
+          }
         },
         headless: true,
         logQR: true,
