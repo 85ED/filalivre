@@ -162,6 +162,45 @@ export async function sendMessage(sessionName, phone, message) {
   return client.sendText(jid, message);
 }
 
+export async function isSessionReady(sessionName) {
+  const client = sessions.get(sessionName);
+  if (!client) return false;
+
+  try {
+    if (typeof client.isMainReady === 'function') {
+      return await client.isMainReady();
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    if (typeof client.isLoggedIn === 'function') {
+      return await client.isLoggedIn();
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    if (typeof client.isAuthenticated === 'function') {
+      return await client.isAuthenticated();
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    if (typeof client.isConnected === 'function') {
+      return await client.isConnected();
+    }
+  } catch {
+    // ignore
+  }
+
+  return false;
+}
+
 export function isSessionActive(sessionName) {
   return sessions.has(sessionName);
 }

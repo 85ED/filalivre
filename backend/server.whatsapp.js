@@ -4,6 +4,7 @@ import {
   startSession,
   startAllSessions,
   isSessionActive,
+  isSessionReady,
   getLastQR,
   disconnectSession,
   sendMessage,
@@ -51,7 +52,7 @@ app.post('/send', async (req, res) => {
     if (!sessionName || !phone || !message) {
       return res.status(400).json({ error: 'session (ou barbershopId), phone e message são obrigatórios' });
     }
-    if (!isSessionActive(sessionName)) {
+    if (!isSessionActive(sessionName) || !(await isSessionReady(sessionName))) {
       return res.status(404).json({ error: 'Sessão WhatsApp não ativa para este estabelecimento' });
     }
     await sendMessage(sessionName, phone, message);
@@ -68,7 +69,7 @@ app.post('/connect/:barbershopId', async (req, res) => {
     const { barbershopId } = req.params;
     const sessionName = 'barbershop_' + barbershopId;
 
-    if (isSessionActive(sessionName)) {
+    if (isSessionActive(sessionName) && (await isSessionReady(sessionName))) {
       return res.json({ success: true, status: 'connected', qr: null });
     }
 
@@ -114,11 +115,13 @@ app.get('/status/:barbershopId', async (req, res) => {
   try {
     const { barbershopId } = req.params;
     const sessionName = 'barbershop_' + barbershopId;
-    const active = isSessionActive(sessionName);
+    const created = isSessionActive(sessionName);
+    const active = created ? await isSessionReady(sessionName) : false;
     const dbSession = await getSessionFromDB(barbershopId);
 
     res.json({
       session: sessionName,
+      created,
       active,
       status: active ? 'connected' : (dbSession?.status || 'disconnected'),
       qr: active ? null : getLastQR(sessionName),

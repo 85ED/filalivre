@@ -1,5 +1,5 @@
 import pool from '../config/database.js';
-import { sendMessage, isSessionActive } from '../services/WhatsAppService.js';
+import { sendMessage, isSessionActive, isSessionReady } from '../services/WhatsAppService.js';
 
 export async function checkQueueAlerts() {
   try {
@@ -7,9 +7,9 @@ export async function checkQueueAlerts() {
     const [candidates] = await pool.query(
       `SELECT * FROM queue
        WHERE status = 'waiting'
-       AND alert_sent = false
+       AND (alert_sent = false OR alert_sent IS NULL)
        AND phone IS NOT NULL
-       AND phone != ''`
+       AND TRIM(phone) != ''`
     );
 
     for (const client of candidates) {
@@ -29,7 +29,7 @@ export async function checkQueueAlerts() {
 
       const sessionName = 'barbershop_' + client.barbershop_id;
 
-      if (!isSessionActive(sessionName)) {
+      if (!isSessionActive(sessionName) || !(await isSessionReady(sessionName))) {
         continue;
       }
 
