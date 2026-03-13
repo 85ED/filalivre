@@ -4,6 +4,7 @@ import {
   startSession,
   startAllSessions,
   isSessionActive,
+  isSessionReady,
   getLastQR,
   disconnectSession,
   getSession,

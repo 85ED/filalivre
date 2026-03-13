@@ -3,7 +3,6 @@ import pool from './src/config/database.js';
 
 const WHATSAPP_SERVICE_URL = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3003';
 const CHECK_INTERVAL = parseInt(process.env.WORKER_INTERVAL || '5000', 10);
-const DEBUG = process.env.WORKER_DEBUG === '1';
 
 console.log(`
 ╔══════════════════════════════════════════╗
@@ -12,13 +11,6 @@ console.log(`
 ║  Interval: ${CHECK_INTERVAL}ms
 ╚══════════════════════════════════════════╝
 `);
-
-function maskPhone(raw) {
-  const digits = String(raw || '').replace(/\D/g, '');
-  if (!digits) return '';
-  if (digits.length <= 4) return '*'.repeat(digits.length);
-  return `${'*'.repeat(Math.max(0, digits.length - 4))}${digits.slice(-4)}`;
-}
 
 async function sendWhatsAppMessage(barbershopId, phone, message) {
   const response = await fetch(`${WHATSAPP_SERVICE_URL}/send`, {
@@ -47,35 +39,14 @@ async function checkWhatsAppStatus(barbershopId) {
 async function checkQueueAlerts() {
   try {
     const [candidates] = await pool.query(
-      `SELECT id, name, phone, status, alert_sent, position, barbershop_id
-       FROM queue
+      `SELECT * FROM queue
        WHERE status = 'waiting'
-       AND (alert_sent = false OR alert_sent IS NULL)
+       AND alert_sent = false
        AND phone IS NOT NULL
-       AND TRIM(phone) != ''`
+       AND phone != ''`
     );
 
-    if (DEBUG) {
-      console.log(`[Worker] Candidates found: ${candidates.length}`);
-    }
-
-    let sentCount = 0;
-    let skippedAhead = 0;
-    let skippedInactive = 0;
-    let skippedBadPosition = 0;
-    let errorCount = 0;
-
     for (const client of candidates) {
-      if (!client.position || Number(client.position) <= 0) {
-        skippedBadPosition++;
-        if (DEBUG) {
-          console.log(
-            `[Worker] Skip: invalid position for ${client.name} (id=${client.id}, position=${client.position})`
-          );
-        }
-        continue;
-      }
-
       const [ahead] = await pool.query(
         `SELECT COUNT(*) as cnt FROM queue
          WHERE barbershop_id = ?
@@ -85,45 +56,11 @@ async function checkQueueAlerts() {
       );
 
       const peopleAhead = ahead[0].cnt;
-      if (peopleAhead > 3) {
-        skippedAhead++;
-        if (DEBUG) {
-          console.log(
-            `[Worker] Skip: ${client.name} (id=${client.id}) peopleAhead=${peopleAhead} > 3`
-          );
-        }
-        continue;
-      }
+      if (peopleAhead > 3) continue;
 
       // Check if WhatsApp session is active via HTTP
       const sessionActive = await checkWhatsAppStatus(client.barbershop_id);
-      if (!sessionActive) {
-        skippedInactive++;
-        if (DEBUG) {
-          console.log(
-            `[Worker] Skip: WhatsApp inactive for barbershop_id=${client.barbershop_id} (client=${client.name}, id=${client.id})`
-          );
-        }
-        continue;
-      }
-
-      // Claim atômico para evitar múltiplos envios em paralelo (ex.: 2 workers/2 pods)
-      // Só 1 worker conseguirá marcar alert_sent=true para este id.
-      const [claim] = await pool.query(
-        `UPDATE queue
-         SET alert_sent = true
-         WHERE id = ?
-           AND status = 'waiting'
-           AND (alert_sent = false OR alert_sent IS NULL)`,
-        [client.id]
-      );
-
-      if (!claim?.affectedRows) {
-        if (DEBUG) {
-          console.log(`[Worker] Skip: already claimed/sent (id=${client.id})`);
-        }
-        continue;
-      }
+      if (!sessionActive) continue;
 
       try {
         const message = peopleAhead === 0
@@ -132,31 +69,16 @@ async function checkQueueAlerts() {
 
         await sendWhatsAppMessage(client.barbershop_id, client.phone, message);
 
-        sentCount++;
-        console.log(
-          `[Worker] WhatsApp enviado para ${client.name} (${maskPhone(client.phone)}) - ${peopleAhead} à frente`
+        await pool.query(
+          'UPDATE queue SET alert_sent = true WHERE id = ?',
+          [client.id]
         );
-      } catch (err) {
-        errorCount++;
-        console.error(`[Worker] Erro ao enviar WhatsApp para ${client.name}:`, err.message);
 
-        // Se falhar o envio, desfaz o claim para tentar novamente no próximo ciclo
-        try {
-          await pool.query(
-            `UPDATE queue
-             SET alert_sent = false
-             WHERE id = ?`,
-            [client.id]
-          );
-        } catch (rollbackErr) {
-          console.error('[Worker] Erro ao desfazer claim (alert_sent):', rollbackErr?.message || rollbackErr);
-        }
+        console.log(`[Worker] WhatsApp enviado para ${client.name} (${client.phone}) - ${peopleAhead} à frente`);
+      } catch (err) {
+        console.error(`[Worker] Erro ao enviar WhatsApp para ${client.name}:`, err.message);
       }
     }
-
-    console.log(
-      `[Worker] Summary: candidates=${candidates.length} sent=${sentCount} skippedAhead=${skippedAhead} skippedInactive=${skippedInactive} skippedBadPosition=${skippedBadPosition} errors=${errorCount}`
-    );
   } catch (err) {
     console.error('[Worker] Erro ao verificar alertas:', err.message);
   }

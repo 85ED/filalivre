@@ -8,6 +8,12 @@ const qrCodes = new Map();
 // Evita múltiplos starts concorrentes da mesma sessão
 const startingSessions = new Map();
 
+// TokenStore em disco (essencial para restaurar após restart do container)
+// OBS: em redeploy (container novo), isso só persiste se o disco persistir.
+const fileTokenStore = new wppconnect.tokenStore.FileTokenStore({
+  path: './tokens',
+});
+
 // Evita gravar status repetidamente no banco a cada callback
 const lastPersistedStatus = new Map();
 
@@ -57,10 +63,18 @@ function getChromiumPath() {
     console.log('[WhatsApp] ✗ Chromium não encontrado em:', p);
   }
 
-  // Erro crítico - Chromium não encontrado
-  const errorMsg = `❌ CRÍTICO: Chromium não encontrado em nenhum dos locais: ${candidates.join(', ')}`;
-  console.error('[WhatsApp]', errorMsg);
-  throw new Error(errorMsg);
+  const errorMsg = `Chromium não encontrado em nenhum dos locais: ${candidates.join(', ')}`;
+  const requireChromium =
+    process.env.REQUIRE_CHROMIUM === 'true' ||
+    (process.platform === 'linux' && process.env.NODE_ENV === 'production');
+
+  if (requireChromium) {
+    console.error('[WhatsApp] ❌ CRÍTICO:', errorMsg);
+    throw new Error(`❌ CRÍTICO: ${errorMsg}`);
+  }
+
+  console.warn('[WhatsApp] [WARN]', errorMsg, '- usando Chromium padrão do Puppeteer/WPPConnect');
+  return null;
 }
 
 export async function startSession(sessionName) {
@@ -76,12 +90,15 @@ export async function startSession(sessionName) {
 
   // CRÍTICO: Sempre obter Chromium do sistema, não fallback para bundled
   const chromiumPath = getChromiumPath();
-  console.log('[WhatsApp] Iniciando sessão com Chromium:', chromiumPath);
+  if (chromiumPath) {
+    console.log('[WhatsApp] Iniciando sessão com Chromium:', chromiumPath);
+  }
 
   const startPromise = (async () => {
     try {
       const client = await wppconnect.create({
         session: sessionName,
+        tokenStore: fileTokenStore,
         catchQR: (base64Qr) => {
           console.log('[WhatsApp] QR Code gerado para sessão:', sessionName);
           qrCodes.set(sessionName, base64Qr);
@@ -100,6 +117,7 @@ export async function startSession(sessionName) {
             normalized.includes('main')
           ) {
             persistSessionStatus(sessionName, 'connected');
+            qrCodes.delete(sessionName);
           }
 
           if (normalized.includes('disconnected')) {
@@ -108,8 +126,19 @@ export async function startSession(sessionName) {
         },
         headless: true,
         logQR: true,
+        // CRÍTICO: não auto-fechar após scan/sync (Railway pode demorar e isso derruba a sessão)
+        autoClose: 0,
+        deviceSyncTimeout: 0,
+        // Aguarda login para devolver o client (evita /status ficar false após scan)
+        waitForLogin: true,
         // CRÍTICO: Sempre passar browserPathExecutable, não deixar undefined
-        browserPathExecutable: chromiumPath,
+        ...(chromiumPath
+          ? {
+              puppeteerOptions: {
+                executablePath: chromiumPath,
+              },
+            }
+          : {}),
         browserArgs: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -121,6 +150,7 @@ export async function startSession(sessionName) {
       });
 
       sessions.set(sessionName, client);
+      qrCodes.delete(sessionName);
       return client;
     } catch (err) {
       console.error('[WhatsApp] Erro ao iniciar sessão:', sessionName, err?.message || err);
@@ -139,20 +169,57 @@ export async function startSession(sessionName) {
 export async function startAllSessions() {
   try {
     console.log("[WhatsApp] [DEBUG] startAllSessions: Iniciando...");
-    const [rows] = await pool.query(`
-      SELECT barbershop_id
-      FROM whatsapp_sessions
-      WHERE status = 'connected'
-    `);
+    const [rows] = await pool.query(
+      `SELECT barbershop_id
+       FROM whatsapp_sessions
+       WHERE status = 'connected'`
+    );
 
-    console.log(`[WhatsApp] [DEBUG] Encontradas ${rows.length} sessões no banco`);
-    console.log(`[WhatsApp] Iniciando ${rows.length} sessões do banco de dados...`);
+    let tokenSessions = [];
+    try {
+      tokenSessions = await fileTokenStore.listTokens();
+    } catch (err) {
+      console.error('[WhatsApp] [WARN] Não foi possível listar tokens:', err?.message || err);
+    }
 
+    const sessionNames = new Set();
     for (const row of rows) {
-      const sessionName = "barbershop_" + row.barbershop_id;
+      sessionNames.add('barbershop_' + row.barbershop_id);
+    }
+    for (const name of tokenSessions) {
+      if (String(name).startsWith('barbershop_')) {
+        sessionNames.add(String(name));
+      }
+    }
+
+    console.log(`[WhatsApp] [DEBUG] Sessões conectadas no banco: ${rows.length}`);
+    console.log(`[WhatsApp] [DEBUG] Tokens encontrados em disco: ${tokenSessions.length}`);
+    console.log(`[WhatsApp] Iniciando ${sessionNames.size} sessões (banco + tokens)...`);
+
+    for (const sessionName of sessionNames) {
       try {
         console.log(`[WhatsApp] [DEBUG] Iniciando sessão: ${sessionName}`);
         await startSession(sessionName);
+
+        // Se a sessão está de fato iniciando, aguarda um pouco para restaurar o client.
+        // Isso melhora o cenário: reinicia container -> /status já enxergar active=true.
+        const startPromise = startingSessions.get(sessionName);
+        if (startPromise) {
+          const timeoutMs = Number(process.env.WHATSAPP_RESTORE_WAIT_MS || 45000);
+          await Promise.race([
+            startPromise,
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('timeout_waiting_session_start')), timeoutMs)
+            ),
+          ]).catch((err) => {
+            if (String(err?.message || err) === 'timeout_waiting_session_start') {
+              console.warn(`[WhatsApp] [WARN] Timeout aguardando restore de ${sessionName} (${timeoutMs}ms)`);
+              return;
+            }
+            console.error(`[WhatsApp] [WARN] Erro aguardando start de ${sessionName}:`, err?.message || err);
+          });
+        }
+
         console.log(`[WhatsApp] Sessão iniciada: ${sessionName}`);
       } catch (err) {
         console.error(`[WhatsApp] Erro ao iniciar sessão ${sessionName}:`, err.message);
