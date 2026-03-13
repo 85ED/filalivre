@@ -5,6 +5,8 @@ import { existsSync } from 'fs';
 const sessions = new Map();
 // Armazena último QR gerado por sessão (acessível pelo controller)
 const qrCodes = new Map();
+// Evita múltiplos starts concorrentes da mesma sessão
+const startingSessions = new Map();
 
 // Detecta Chromium do sistema (crítico para Railway/Docker)
 // DEVE ser /usr/bin/chromium em Alpine/Linux, não fallback para bundled
@@ -43,49 +45,54 @@ export async function startSession(sessionName) {
     return { client: sessions.get(sessionName), qr: null };
   }
 
-  // Cria promise que resolve quando o QR é gerado ou a sessão conecta
-  let qrResolve;
-  const qrPromise = new Promise((resolve) => {
-    qrResolve = resolve;
-    // Timeout de 30s caso não gere QR (sessão já autenticada)
-    setTimeout(() => resolve(null), 30000);
-  });
+  // Se já existe start em andamento, não bloquear a request
+  if (startingSessions.has(sessionName)) {
+    return { client: sessions.get(sessionName) || null, qr: getLastQR(sessionName) };
+  }
 
   // CRÍTICO: Sempre obter Chromium do sistema, não fallback para bundled
   const chromiumPath = getChromiumPath();
   console.log('[WhatsApp] Iniciando sessão com Chromium:', chromiumPath);
 
-  const client = await wppconnect.create({
-    session: sessionName,
-    catchQR: (base64Qr) => {
-      console.log('[WhatsApp] QR Code gerado para sessão:', sessionName);
-      qrCodes.set(sessionName, base64Qr);
-      qrResolve(base64Qr);
-    },
-    statusFind: (statusSession) => {
-      console.log('[WhatsApp] Status da sessão:', statusSession);
-      if (statusSession === 'isLogged' || statusSession === 'qrReadSuccess') {
-        qrResolve(null); // Já conectado, não precisa de QR
-      }
-    },
-    headless: true,
-    logQR: true,
-    // CRÍTICO: Sempre passar browserPathExecutable, não deixar undefined
-    browserPathExecutable: chromiumPath,
-    browserArgs: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--no-first-run',
-      '--no-zygote',
-    ],
-  });
+  const startPromise = (async () => {
+    try {
+      const client = await wppconnect.create({
+        session: sessionName,
+        catchQR: (base64Qr) => {
+          console.log('[WhatsApp] QR Code gerado para sessão:', sessionName);
+          qrCodes.set(sessionName, base64Qr);
+        },
+        statusFind: (statusSession) => {
+          console.log('[WhatsApp] Status da sessão:', statusSession);
+        },
+        headless: true,
+        logQR: true,
+        // CRÍTICO: Sempre passar browserPathExecutable, não deixar undefined
+        browserPathExecutable: chromiumPath,
+        browserArgs: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--no-first-run',
+          '--no-zygote',
+        ],
+      });
 
-  sessions.set(sessionName, client);
+      sessions.set(sessionName, client);
+      return client;
+    } catch (err) {
+      console.error('[WhatsApp] Erro ao iniciar sessão:', sessionName, err?.message || err);
+      throw err;
+    } finally {
+      startingSessions.delete(sessionName);
+    }
+  })();
 
-  const qr = await qrPromise;
-  return { client, qr };
+  startingSessions.set(sessionName, startPromise);
+
+  // Retorna imediatamente; o QR será capturado via catchQR e exposto em /qr
+  return { client: sessions.get(sessionName) || null, qr: getLastQR(sessionName) };
 }
 
 export async function startAllSessions() {
@@ -154,6 +161,10 @@ export async function disconnectSession(sessionName) {
     }
     sessions.delete(sessionName);
     qrCodes.delete(sessionName);
+  }
+
+  if (startingSessions.has(sessionName)) {
+    startingSessions.delete(sessionName);
   }
 }
 

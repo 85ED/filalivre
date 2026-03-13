@@ -42,6 +42,7 @@ import { BuyCreditsModal } from '@/components/BuyCreditsModal';
 
 type Period = 'today' | 'week' | 'month';
 type View = 'overview' | 'byBarber' | 'barberDetail' | 'whatsapp' | 'professionals';
+type WaStatus = 'disconnected' | 'connecting' | 'waiting_qr' | 'connected';
 
 const PERIOD_LABELS: Record<Period, string> = {
   today: 'Hoje',
@@ -68,10 +69,42 @@ export function AdminPage() {
   const [reportsLoading, setReportsLoading] = useState(false);
 
   // WhatsApp state
-  const [waStatus, setWaStatus] = useState<'disconnected' | 'connecting' | 'waiting_qr' | 'connected'>('disconnected');
+  const [waStatus, setWaStatus] = useState<WaStatus>('disconnected');
   const [waQr, setWaQr] = useState<string | null>(null);
   const [waLoading, setWaLoading] = useState(false);
   const waPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const waQrPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopWaQrPolling = useCallback(() => {
+    if (waQrPollingRef.current) {
+      clearInterval(waQrPollingRef.current);
+      waQrPollingRef.current = null;
+    }
+  }, []);
+
+  const startWaQrPolling = useCallback(() => {
+    if (waQrPollingRef.current) return;
+
+    const startedAt = Date.now();
+    const timeoutMs = 60_000;
+
+    waQrPollingRef.current = setInterval(async () => {
+      try {
+        if (Date.now() - startedAt > timeoutMs) {
+          stopWaQrPolling();
+          return;
+        }
+
+        const qrData = await api.get<{ qr: string | null }>(API_ENDPOINTS.whatsappQr(barbershopId));
+        if (qrData.qr) {
+          setWaQr(qrData.qr);
+          stopWaQrPolling();
+        }
+      } catch {
+        // Ignora falhas transitórias e continua tentando
+      }
+    }, 1000);
+  }, [barbershopId, stopWaQrPolling]);
 
   // Professional CRUD state
   const [showProModal, setShowProModal] = useState(false);
@@ -168,14 +201,27 @@ export function AdminPage() {
       if (data.active) {
         setWaStatus('connected');
         setWaQr(null);
+        stopWaQrPolling();
       } else {
-        setWaStatus(data.status as typeof waStatus || 'disconnected');
-        if (data.qr) setWaQr(data.qr);
+        const nextStatus = (data.status as WaStatus) || 'disconnected';
+        setWaStatus(nextStatus);
+
+        if (nextStatus === 'waiting_qr' || nextStatus === 'connecting') {
+          if (data.qr) {
+            setWaQr(data.qr);
+            stopWaQrPolling();
+          } else {
+            startWaQrPolling();
+          }
+        } else {
+          setWaQr(null);
+          stopWaQrPolling();
+        }
       }
     } catch {
       // ignore
     }
-  }, []);
+  }, [barbershopId, startWaQrPolling, stopWaQrPolling]);
 
   useEffect(() => {
     if (view === 'whatsapp') {
@@ -184,22 +230,36 @@ export function AdminPage() {
       waPollingRef.current = setInterval(fetchWaStatus, 3000);
       return () => {
         if (waPollingRef.current) clearInterval(waPollingRef.current);
+        stopWaQrPolling();
       };
     } else {
       if (waPollingRef.current) clearInterval(waPollingRef.current);
+      stopWaQrPolling();
     }
-  }, [view, fetchWaStatus]);
+  }, [view, fetchWaStatus, stopWaQrPolling]);
 
   const handleWaConnect = async () => {
     setWaLoading(true);
     try {
+      setWaStatus('connecting');
+      setWaQr(null);
+      stopWaQrPolling();
+
       const data = await api.post<{ success: boolean; status: string; qr: string | null }>(
         API_ENDPOINTS.whatsappConnect(barbershopId)
       );
-      setWaStatus(data.status as typeof waStatus);
-      if (data.qr) setWaQr(data.qr);
+      const nextStatus = (data.status as WaStatus) || 'waiting_qr';
+      setWaStatus(nextStatus);
+
+      if (data.qr) {
+        setWaQr(data.qr);
+        stopWaQrPolling();
+      } else if (nextStatus === 'waiting_qr' || nextStatus === 'connecting') {
+        startWaQrPolling();
+      }
     } catch (err) {
       console.error('Erro ao conectar WhatsApp:', err);
+      setWaStatus('disconnected');
     } finally {
       setWaLoading(false);
     }
@@ -208,6 +268,7 @@ export function AdminPage() {
   const handleWaDisconnect = async () => {
     setWaLoading(true);
     try {
+      stopWaQrPolling();
       await api.post(API_ENDPOINTS.whatsappDisconnect(barbershopId));
       setWaStatus('disconnected');
       setWaQr(null);
@@ -217,6 +278,12 @@ export function AdminPage() {
       setWaLoading(false);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      stopWaQrPolling();
+    };
+  }, [stopWaQrPolling]);
 
   // Professional CRUD handlers
   const openCreatePro = () => {
@@ -944,11 +1011,16 @@ export function AdminPage() {
                     </>
                   ) : waStatus === 'waiting_qr' || waStatus === 'connecting' ? (
                     <button
-                      disabled
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-50 text-amber-700 font-semibold text-sm opacity-80"
+                      onClick={handleWaConnect}
+                      disabled={waLoading}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-50 text-amber-700 font-semibold text-sm hover:bg-amber-100 transition-colors disabled:opacity-50"
                     >
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Aguardando escaneamento...
+                      {waLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4" />
+                      )}
+                      Gerar novo QR
                     </button>
                   ) : (
                     <button

@@ -72,13 +72,22 @@ app.post('/connect/:barbershopId', async (req, res) => {
       return res.json({ success: true, status: 'connected', qr: null });
     }
 
-    const { qr } = await startSession(sessionName);
-    await registerSession(barbershopId, qr ? 'waiting_qr' : 'connected');
+    // Inicia em background: o QR pode demorar (15-30s) e não pode travar a request.
+    startSession(sessionName).catch((err) => {
+      console.error('[WhatsApp] Erro ao iniciar sessão (async):', err?.message || err);
+    });
 
-    res.json({
+    try {
+      await registerSession(barbershopId, 'waiting_qr');
+    } catch (err) {
+      console.error('[WhatsApp] Erro ao salvar sessão no banco:', err?.message || err);
+    }
+
+    const qr = getLastQR(sessionName) || null;
+    return res.json({
       success: true,
-      status: qr ? 'waiting_qr' : 'connected',
-      qr: qr || null,
+      status: 'waiting_qr',
+      qr,
     });
   } catch (err) {
     console.error('[WhatsApp] Erro ao conectar:', err.message);
