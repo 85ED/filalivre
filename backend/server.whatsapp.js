@@ -4,10 +4,9 @@ import {
   startSession,
   startAllSessions,
   isSessionActive,
-  isSessionReady,
   getLastQR,
   disconnectSession,
-  sendMessage,
+  getSession,
   registerSession,
   getSessionFromDB,
 } from './src/services/WhatsAppService.js';
@@ -16,6 +15,13 @@ const app = express();
 const PORT = process.env.WHATSAPP_PORT || 3003;
 
 app.use(express.json());
+
+function formatPhone(phone) {
+  let number = String(phone || '').replace(/\D/g, '');
+  if (!number) return null;
+  if (!number.startsWith('55')) number = '55' + number;
+  return number + '@c.us';
+}
 
 // Ultra-simple ping (no dependencies, pure response)
 app.get('/ping', (req, res) => {
@@ -52,10 +58,19 @@ app.post('/send', async (req, res) => {
     if (!sessionName || !phone || !message) {
       return res.status(400).json({ error: 'session (ou barbershopId), phone e message são obrigatórios' });
     }
-    if (!isSessionActive(sessionName) || !(await isSessionReady(sessionName))) {
-      return res.status(404).json({ error: 'Sessão WhatsApp não ativa para este estabelecimento' });
+
+    // Mesma regra do /status: se existe no Map de sessões, consideramos ativa
+    const client = getSession(sessionName);
+    if (!client) {
+      return res.status(400).json({ error: 'Sessão WhatsApp não inicializada' });
     }
-    await sendMessage(sessionName, phone, message);
+
+    const jid = formatPhone(phone);
+    if (!jid) {
+      return res.status(400).json({ error: 'Telefone inválido para WhatsApp' });
+    }
+
+    await client.sendText(jid, message);
     res.json({ success: true, message: 'Mensagem enviada' });
   } catch (err) {
     console.error('[WhatsApp] Erro ao enviar:', err.message);
