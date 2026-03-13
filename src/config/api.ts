@@ -12,7 +12,6 @@ export const API_ENDPOINTS = {
   removeFromQueue: '/queue/remove',
   callNext: '/queue/call-next',
   finishClient: '/queue/finish',
-  acceptClient: '/queue/accept',
   skipClient: '/queue/skip',
   
   // Barbers

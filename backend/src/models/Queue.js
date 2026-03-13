@@ -158,11 +158,10 @@ export class Queue {
 
       const clientId = clients[0].id;
 
-      // Atualiza status para 'called' (cliente chamado, aguardando aceitar)
-      // Atribui ao barbeiro mas NÃO inicia timer ainda
+      // Atualiza status para serving e atribui ao barbeiro
       await connection.query(
         `UPDATE queue 
-         SET status = 'called', barber_id = ?, updated_at = NOW()
+         SET status = 'serving', barber_id = ?, service_start_time = NOW(), updated_at = NOW()
          WHERE id = ?`,
         [barberId, clientId]
       );
@@ -175,17 +174,6 @@ export class Queue {
     } finally {
       connection.release();
     }
-  }
-
-  // Aceita cliente que foi chamado, mudando de 'called' para 'serving' e iniciando timer
-  static async acceptClient(clientQueueId) {
-    const [result] = await pool.query(
-      `UPDATE queue 
-       SET status = 'serving', service_start_time = NOW(), updated_at = NOW()
-       WHERE id = ? AND status = 'called'`,
-      [clientQueueId]
-    );
-    return result.affectedRows > 0;
   }
 
   static async assignBarberToClient(clientQueueId, barberId) {

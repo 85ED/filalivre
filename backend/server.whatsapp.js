@@ -68,67 +68,21 @@ app.post('/connect/:barbershopId', async (req, res) => {
     const { barbershopId } = req.params;
     const sessionName = 'barbershop_' + barbershopId;
 
-    console.log('[WhatsApp.connect] ===== INICIANDO CONEXÃO =====');
-    console.log('[WhatsApp.connect] Session:', sessionName);
-
-    // Só tenta desconectar se houver sessão ativa em memória.
-    // Se a sessão estiver "iniciando" (QR já logou) mas ainda não entrou no Map,
-    // desconectar aqui causa corrida e pode disparar lock de userDataDir.
     if (isSessionActive(sessionName)) {
-      try {
-        console.log('[WhatsApp.connect] Tentando destruir sessão ativa...');
-        await disconnectSession(sessionName);
-        console.log('[WhatsApp.connect] ✓ Sessão ativa destruída');
-      } catch (e) {
-        console.log('[WhatsApp.connect] Falha ao destruir sessão ativa (seguindo):', e?.message || e);
-      }
-    } else {
-      console.log('[WhatsApp.connect] Nenhuma sessão ativa em memória; iniciando/recuperando sessão');
+      return res.json({ success: true, status: 'connected', qr: null });
     }
 
-    // Criar sessão nova
-    console.log('[WhatsApp.connect] Criando nova sessão...');
     const { qr } = await startSession(sessionName);
+    await registerSession(barbershopId, qr ? 'waiting_qr' : 'connected');
 
-    // Em alguns cenários o QR é emitido de forma assíncrona (logs mostram),
-    // mas a promise retorna qr=null (ex: sessão já iniciada/restore). Então aguardamos um pouco.
-    let finalQr = qr || getLastQR(sessionName);
-    if (!finalQr) {
-      const startedAt = Date.now();
-      const maxWaitMs = 12000;
-      while (!finalQr && Date.now() - startedAt < maxWaitMs) {
-        await new Promise((r) => setTimeout(r, 250));
-        finalQr = getLastQR(sessionName);
-      }
-    }
-
-    if (!finalQr) {
-      console.error('[WhatsApp.connect] ❌ QR não foi gerado (timeout aguardando catchQR)');
-      return res.status(500).json({ error: 'QR não foi gerado' });
-    }
-
-    console.log('[WhatsApp.connect] ✓ QR gerado com sucesso');
-    console.log('[WhatsApp.connect] QR (primeiros 50 chars):', finalQr.substring(0, 50) + '...');
-    
-    // Registrar no banco
-    await registerSession(barbershopId, 'waiting_qr');
-    console.log('[WhatsApp.connect] ✓ Sessão registrada no banco');
-
-    // RETORNAR QR PARA O FRONTEND
-    return res.json({
+    res.json({
       success: true,
-      status: 'waiting_qr',
-      qr: finalQr,
+      status: qr ? 'waiting_qr' : 'connected',
+      qr: qr || null,
     });
-
   } catch (err) {
-    console.error('[WhatsApp.connect] ❌ ERRO CRÍTICO:', err.message);
-    console.error('[WhatsApp.connect] Stack:', err.stack);
-    
-    return res.status(500).json({ 
-      error: 'Erro ao iniciar sessão WhatsApp',
-      details: err.message 
-    });
+    console.error('[WhatsApp] Erro ao conectar:', err.message);
+    res.status(500).json({ error: 'Erro ao iniciar sessão WhatsApp' });
   }
 });
 
@@ -158,7 +112,7 @@ app.get('/status/:barbershopId', async (req, res) => {
       session: sessionName,
       active,
       status: active ? 'connected' : (dbSession?.status || 'disconnected'),
-      qr: null,  // NEVER return QR from status endpoint - only from /connect endpoint
+      qr: active ? null : getLastQR(sessionName),
     });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao verificar status' });

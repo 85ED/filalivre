@@ -10,7 +10,6 @@ router.get('/recover', QueueController.recover); // Must be before /:barbershopI
 router.get('/:barbershopId', QueueController.getQueue);
 router.post('/call-next', QueueController.callNext);
 router.post('/finish', QueueController.finishClient);
-router.post('/accept', QueueController.acceptClient);
 router.post('/remove', QueueController.remove);
 router.post('/skip', QueueController.skip);
 router.get('/monitor/:barbershopId', QueueController.monitor);

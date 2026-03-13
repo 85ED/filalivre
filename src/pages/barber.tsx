@@ -252,8 +252,8 @@ export function BarberPage() {
           </motion.div>
         )}
 
-        {/* ATENDENDO AGORA - apenas quando status = 'serving' */}
-        {currentClient && currentClient.status === 'serving' && (
+        {/* ATENDENDO AGORA */}
+        {currentClient && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -278,57 +278,14 @@ export function BarberPage() {
                 </div>
               </div>
 
-              <Button
-                onClick={handleFinish}
-                disabled={loading}
-                className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-sm"
-              >
-                <CircleCheck className="w-4 h-4 mr-2" />
-                Finalizar
-              </Button>
-            </div>
-          </motion.div>
-        )}
-
-        {/* CLIENTE CHAMADO - quando status = 'called' */}
-        {currentClient && currentClient.status === 'called' && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-2xl p-5 shadow-sm border border-neutral-200"
-          >
-            <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-500 mb-4">
-              Próximo cliente
-            </h2>
-            <div className="bg-blue-50 rounded-xl p-5 space-y-4 border border-blue-200">
-              <div className="text-center">
-                <div className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center mx-auto mb-3">
-                  <User className="w-7 h-7 text-white" />
-                </div>
-                <p className="text-2xl font-black text-neutral-900">{currentClient.name}</p>
-                <p className="text-sm text-blue-600 mt-1 font-semibold">Aguardando aceitar</p>
-              </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <Button
-                  onClick={() => {
-                    setLoading(true);
-                    queueService.acceptClient(currentClient.id, barbershopId)
-                      .then(() => {
-                        refetchQueue();
-                        setLoading(false);
-                      })
-                      .catch(err => {
-                        console.error('Failed to accept:', err);
-                        setError('Erro ao aceitar cliente');
-                        setLoading(false);
-                      });
-                  }}
+                  onClick={handleFinish}
                   disabled={loading}
                   className="h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-sm"
                 >
                   <CircleCheck className="w-4 h-4 mr-2" />
-                  Aceitar
+                  Finalizar
                 </Button>
                 <Button
                   onClick={() => handleSkip(currentClient.id)}
