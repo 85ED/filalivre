@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Container } from '@/components/layout';
+import { Container, PublicFooter } from '@/components/layout';
 import { Bell, User, AlertCircle, Gamepad2, Phone, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -108,8 +108,14 @@ export function ClientQueuePage() {
     }
   };
 
-  const userPosition = currentQueueItem
-    ? queue.filter(q => q.status !== 'finished').findIndex(q => q.id === currentQueueItem.id) + 1
+  const effectiveQueueItem = currentQueueItem
+    ? (queue.find((q) => q.id === currentQueueItem.id) || currentQueueItem)
+    : null;
+
+  const effectiveStatus = effectiveQueueItem?.status;
+
+  const userPosition = effectiveQueueItem
+    ? queue.filter(q => q.status !== 'finished').findIndex(q => q.id === effectiveQueueItem.id) + 1
     : 0;
 
   const queueLength = queue.filter(q => q.status !== 'finished').length;
@@ -262,9 +268,17 @@ export function ClientQueuePage() {
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                              <div className="w-12 h-12 rounded-full bg-emerald-600 flex items-center justify-center flex-shrink-0">
-                                <User className="w-6 h-6 text-white" />
-                              </div>
+                              {barber.photoUrl ? (
+                                <img
+                                  src={barber.photoUrl}
+                                  alt={barber.name}
+                                  className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 rounded-full bg-emerald-600 flex items-center justify-center flex-shrink-0">
+                                  <User className="w-6 h-6 text-white" />
+                                </div>
+                              )}
                               <div className="min-w-0">
                                 <h4 className="font-semibold text-neutral-900 truncate">{barber.name}</h4>
                                 <p className="text-sm text-neutral-500">
@@ -453,25 +467,26 @@ export function ClientQueuePage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <motion.button
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.99 }}
-              onClick={handleLeaveQueue}
-              className="w-full h-11 bg-white hover:bg-red-50 text-red-600 rounded-xl font-semibold border-2 border-red-300 transition-all"
-            >
-              Sair da fila
-            </motion.button>
+            {effectiveStatus === 'serving' ? (
+              <div className="w-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <p className="text-sm font-semibold text-amber-800">Você está em atendimento.</p>
+                <p className="text-xs text-amber-700 mt-1">Para evitar inconsistências, não é possível sair da fila agora.</p>
+              </div>
+            ) : (
+              <motion.button
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                onClick={handleLeaveQueue}
+                className="w-full h-11 bg-white hover:bg-red-50 text-red-600 rounded-xl font-semibold border-2 border-red-300 transition-all"
+              >
+                Sair da fila
+              </motion.button>
+            )}
           </motion.div>
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="bg-neutral-900 border-t border-neutral-800 py-6 mt-8">
-        <div className="max-w-[420px] mx-auto px-4 text-center">
-          <p className="text-xs text-neutral-400">FilaLivre</p>
-          <p className="text-xs text-neutral-500 mt-1">&copy; Sistema inteligente de fila de atendimento</p>
-        </div>
-      </div>
+      <PublicFooter />
 
     </div>
   );

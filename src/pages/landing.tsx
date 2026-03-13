@@ -7,6 +7,7 @@ import { ArrowRight, Smartphone, Eye, Bell, CircleCheck as CheckCircle, LogIn, X
 import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { FilaLivreLogo } from '@/components/ui/filalivre-logo';
+import { PublicFooter } from '@/components/layout';
 import { useAuth } from '@/hooks';
 import { ProjectsSection } from '@/components/ProjectsSection';
 import { api } from '@/services/api';
@@ -723,12 +724,7 @@ export function LandingPage() {
 
       </main>
 
-      <footer className="py-8 bg-neutral-900 text-white" role="contentinfo">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-lg mb-2">FilaLivre &copy; {new Date().getFullYear()}</p>
-          <p className="text-neutral-400">Sistema de gestão de filas para atendimento presencial</p>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

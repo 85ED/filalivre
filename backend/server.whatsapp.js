@@ -5,6 +5,7 @@ import {
   startAllSessions,
   isSessionActive,
   isSessionReady,
+  isSessionStarting,
   getLastQR,
   disconnectSession,
   getSession,
@@ -172,13 +173,26 @@ app.get('/status/:barbershopId', async (req, res) => {
     const { barbershopId } = req.params;
     const sessionName = 'barbershop_' + barbershopId;
     const active = isSessionActive(sessionName);
+    const starting = isSessionStarting(sessionName);
+    const ready = active ? await isSessionReady(sessionName) : false;
     const dbSession = await getSessionFromDB(barbershopId);
+
+    const dbStatus = dbSession?.status || 'disconnected';
+    const status = ready
+      ? 'connected'
+      : (active || starting)
+        ? 'connecting'
+        : dbStatus === 'connected'
+          ? 'restoring'
+          : dbStatus;
 
     res.json({
       session: sessionName,
-      active,
-      status: active ? 'connected' : (dbSession?.status || 'disconnected'),
-      qr: active ? null : getLastQR(sessionName),
+      active: ready,
+      ready,
+      starting,
+      status,
+      qr: ready ? null : getLastQR(sessionName),
     });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao verificar status' });

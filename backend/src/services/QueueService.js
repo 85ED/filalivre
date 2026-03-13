@@ -156,6 +156,10 @@ export class QueueService {
       throw createNotFoundError('Queue entry not found');
     }
 
+    if (client.status === 'serving') {
+      throw createValidationError('Cannot remove client while serving');
+    }
+
     await Queue.remove(queueId);
     return true;
   }

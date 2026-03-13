@@ -42,7 +42,7 @@ import { BuyCreditsModal } from '@/components/BuyCreditsModal';
 
 type Period = 'today' | 'week' | 'month';
 type View = 'overview' | 'byBarber' | 'barberDetail' | 'whatsapp' | 'professionals';
-type WaStatus = 'disconnected' | 'connecting' | 'waiting_qr' | 'connected';
+type WaStatus = 'disconnected' | 'connecting' | 'waiting_qr' | 'restoring' | 'connected';
 
 const PERIOD_LABELS: Record<Period, string> = {
   today: 'Hoje',
@@ -184,6 +184,33 @@ export function AdminPage() {
     }
   }, [period]);
 
+  const heatmapMatrix = (() => {
+    const matrix = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0));
+    const rows = reports?.serviceHeatmap || [];
+    for (const row of rows) {
+      const mysqlDow = Number((row as any).dow);
+      const hour = Number((row as any).hour);
+      const total = Number((row as any).total);
+      if (!Number.isFinite(mysqlDow) || !Number.isFinite(hour) || !Number.isFinite(total)) continue;
+      if (hour < 0 || hour > 23) continue;
+      const dayIndex = (mysqlDow + 5) % 7; // MySQL: 1=Dom..7=Sáb -> index 0=Seg..6=Dom
+      if (dayIndex < 0 || dayIndex > 6) continue;
+      matrix[dayIndex][hour] = total;
+    }
+    return matrix;
+  })();
+
+  const heatmapMax = Math.max(0, ...heatmapMatrix.flat());
+
+  const getHeatmapCellClass = (value: number) => {
+    if (!value || heatmapMax === 0) return 'bg-neutral-100 border-neutral-200';
+    const ratio = value / heatmapMax;
+    if (ratio <= 0.25) return 'bg-emerald-50 border-emerald-100';
+    if (ratio <= 0.5) return 'bg-emerald-100 border-emerald-200';
+    if (ratio <= 0.75) return 'bg-emerald-200 border-emerald-300';
+    return 'bg-emerald-500 border-emerald-600';
+  };
+
   useEffect(() => {
     fetchReports();
   }, [fetchReports]);
@@ -206,7 +233,7 @@ export function AdminPage() {
         const nextStatus = (data.status as WaStatus) || 'disconnected';
         setWaStatus(nextStatus);
 
-        if (nextStatus === 'waiting_qr' || nextStatus === 'connecting') {
+        if (nextStatus === 'waiting_qr' || nextStatus === 'connecting' || nextStatus === 'restoring') {
           if (data.qr) {
             setWaQr(data.qr);
             stopWaQrPolling();
@@ -762,6 +789,51 @@ export function AdminPage() {
                 </div>
               </div>
 
+              {/* Heatmap KPI */}
+              <div className="bg-white rounded-2xl p-4 sm:p-6 border border-neutral-200 shadow-sm max-w-full overflow-hidden">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center flex-shrink-0">
+                    <Calendar className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0 space-y-3">
+                    <div>
+                      <p className="text-sm text-neutral-500">Heatmap de horários de atendimento</p>
+                      <p className="text-xs text-neutral-400">Início de atendimento por dia da semana e hora ({PERIOD_LABELS[period].toLowerCase()})</p>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <div className="min-w-[720px]">
+                        <div className="grid grid-cols-[56px_repeat(24,1fr)] gap-1">
+                          <div />
+                          {Array.from({ length: 24 }).map((_, h) => (
+                            <div key={h} className="text-[10px] text-neutral-400 text-center font-medium">
+                              {String(h).padStart(2, '0')}
+                            </div>
+                          ))}
+
+                          {(['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'] as const).map((dayLabel, dayIndex) => (
+                            <div key={dayLabel} className="contents">
+                              <div className="text-xs text-neutral-600 font-semibold flex items-center">{dayLabel}</div>
+                              {heatmapMatrix[dayIndex].map((value, hour) => (
+                                <div
+                                  key={`${dayLabel}-${hour}`}
+                                  title={`${dayLabel} ${String(hour).padStart(2, '0')}h: ${value}`}
+                                  className={`h-6 rounded-md border ${getHeatmapCellClass(value)} ${value && value / (heatmapMax || 1) > 0.75 ? 'text-white' : 'text-neutral-700'}`}
+                                />
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-neutral-400">
+                      {heatmapMax === 0 ? 'Sem dados no período selecionado.' : `Maior volume em um horário: ${heatmapMax} atendimentos`}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Queue + Chart */}
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm">
@@ -941,7 +1013,9 @@ export function AdminPage() {
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
                     waStatus === 'connected'
                       ? 'bg-gradient-to-br from-emerald-500 to-green-500'
-                      : 'bg-gradient-to-br from-neutral-400 to-neutral-500'
+                      : waStatus === 'waiting_qr' || waStatus === 'connecting' || waStatus === 'restoring'
+                        ? 'bg-gradient-to-br from-amber-500 to-orange-500'
+                        : 'bg-gradient-to-br from-neutral-400 to-neutral-500'
                   }`}>
                     <MessageCircle className="w-6 h-6 text-white" />
                   </div>
@@ -952,6 +1026,11 @@ export function AdminPage() {
                         <>
                           <Wifi className="w-3.5 h-3.5 text-emerald-500" />
                           <span className="text-sm text-emerald-600 font-medium">Conectado</span>
+                        </>
+                      ) : waStatus === 'restoring' ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 text-amber-500 animate-spin" />
+                          <span className="text-sm text-amber-700 font-medium">Restaurando sessão</span>
                         </>
                       ) : waStatus === 'waiting_qr' || waStatus === 'connecting' ? (
                         <>
@@ -967,6 +1046,15 @@ export function AdminPage() {
                     </div>
                   </div>
                 </div>
+
+                {waStatus === 'restoring' && (
+                  <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                    <p className="text-sm text-amber-800 font-semibold">Estamos tentando restaurar a sessão automaticamente.</p>
+                    <p className="text-xs text-amber-700 mt-1">
+                      Se demorar mais que alguns segundos, você pode forçar uma reconexão ou cancelar para gerar um novo QR.
+                    </p>
+                  </div>
+                )}
 
                 {/* QR Code */}
                 {waQr && waStatus !== 'connected' && (
@@ -1007,6 +1095,29 @@ export function AdminPage() {
                       >
                         <WifiOff className="w-4 h-4" />
                         Desconectar
+                      </button>
+                    </>
+                  ) : waStatus === 'restoring' ? (
+                    <>
+                      <button
+                        onClick={handleWaConnect}
+                        disabled={waLoading}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-50 text-amber-700 font-semibold text-sm hover:bg-amber-100 transition-colors disabled:opacity-50"
+                      >
+                        {waLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-4 h-4" />
+                        )}
+                        Forçar reconexão
+                      </button>
+                      <button
+                        onClick={handleWaDisconnect}
+                        disabled={waLoading}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-neutral-100 text-neutral-700 font-semibold text-sm hover:bg-neutral-200 transition-colors disabled:opacity-50"
+                      >
+                        <WifiOff className="w-4 h-4" />
+                        Cancelar
                       </button>
                     </>
                   ) : waStatus === 'waiting_qr' || waStatus === 'connecting' ? (

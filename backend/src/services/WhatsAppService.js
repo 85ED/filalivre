@@ -343,6 +343,10 @@ export function isSessionActive(sessionName) {
   return sessions.has(sessionName);
 }
 
+export function isSessionStarting(sessionName) {
+  return startingSessions.has(sessionName);
+}
+
 export async function disconnectSession(sessionName) {
   const client = sessions.get(sessionName);
   if (client) {

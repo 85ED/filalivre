@@ -172,11 +172,12 @@ export class BarbershopController {
         endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
       }
 
-      const [totalFinished, avgTime, byBarber, dailyCounts, stats] = await Promise.all([
+      const [totalFinished, avgTime, byBarber, dailyCounts, serviceHeatmap, stats] = await Promise.all([
         Queue.getCountByPeriod(barbershopId, startDate, endDate),
         Queue.getAvgServiceTime(barbershopId, startDate, endDate),
         Queue.getCountByBarber(barbershopId, startDate, endDate),
         Queue.getDailyCountsByMonth(barbershopId, now.getFullYear(), now.getMonth() + 1),
+        Queue.getServiceHeatmap(barbershopId, startDate, endDate),
         Queue.getQueueStats(barbershopId),
       ]);
 
@@ -187,6 +188,7 @@ export class BarbershopController {
         currentWaiting: stats.waiting || 0,
         byBarber,
         dailyCounts,
+        serviceHeatmap,
       });
     } catch (error) {
       next(error);

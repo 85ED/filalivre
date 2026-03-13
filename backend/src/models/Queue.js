@@ -454,6 +454,21 @@ export class Queue {
     );
     return rows;
   }
+
+  static async getServiceHeatmap(barbershopId, startDate, endDate) {
+    const [rows] = await pool.query(
+      `SELECT DAYOFWEEK(service_start_time) as dow, HOUR(service_start_time) as hour, COUNT(*) as total
+       FROM queue
+       WHERE barbershop_id = ?
+         AND status = 'finished'
+         AND service_start_time IS NOT NULL
+         AND service_start_time >= ? AND service_start_time < ?
+       GROUP BY DAYOFWEEK(service_start_time), HOUR(service_start_time)
+       ORDER BY dow ASC, hour ASC`,
+      [barbershopId, startDate, endDate]
+    );
+    return rows;
+  }
 }
 
 export default Queue;

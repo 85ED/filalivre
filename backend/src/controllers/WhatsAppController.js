@@ -297,7 +297,7 @@ export default class WhatsAppController {
 
       console.log(`[WhatsApp.status] ✓ Status obtido - active: ${data.active}, dbSession:`, dbSession?.status);
 
-      // Update status in database if active and not already marked as connected
+      // Update status in database if active (ready) and not already marked as connected
       if (data.active === true && dbSession?.status !== 'connected') {
         try {
           await pool.query(`
@@ -315,7 +315,9 @@ export default class WhatsAppController {
       res.json({
         session: `barbershop_${parsedBarbershopId}`,
         active: data.active || false,
-        status: data.active ? 'connected' : (dbSession?.status || 'disconnected'),
+        ready: data.ready === true,
+        starting: data.starting === true,
+        status: (data.status || (data.active ? 'connected' : (dbSession?.status || 'disconnected'))),
         qr: data.qr || null,
       });
     } catch (err) {

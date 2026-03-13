@@ -15,6 +15,12 @@ export interface ReportsData {
     day: number;
     total: number;
   }>;
+
+  serviceHeatmap?: Array<{
+    dow: number;
+    hour: number;
+    total: number;
+  }>;
 }
 
 export interface BarberClientData {
