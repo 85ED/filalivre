@@ -100,6 +100,21 @@ export class QueueController {
     }
   }
 
+  static async acceptClient(req, res, next) {
+    try {
+      const { clientQueueId, barbershopId } = req.body;
+
+      if (!clientQueueId || !barbershopId) {
+        return res.status(400).json({ error: 'Client Queue ID and Barbershop ID are required' });
+      }
+
+      const client = await QueueService.acceptClient(clientQueueId, barbershopId);
+      res.json({ success: true, client });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async remove(req, res, next) {
     try {
       const { queueId, barbershopId } = req.body;

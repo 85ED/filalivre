@@ -106,22 +106,35 @@ export class QueueService {
       throw createValidationError('Barber has no current client');
     }
 
-    // Mark as finished
+    // Mark as finished - ONLY finish, do NOT call next automatically
     await Queue.updateStatus(barber.current_client_id, 'finished');
     await Barber.setCurrentClient(barberId, null);
 
-    // Try to call next client
-    const nextClientId = await Queue.callNext(barbershopId, barberId);
-    if (nextClientId) {
-      await Barber.setCurrentClient(barberId, nextClientId);
-      const nextClient = await Queue.findById(nextClientId);
-      return { finished: true, nextClient };
-    }
-
-    // No more clients, set barber to available
+    // Set barber to available - waiting for them to call next themselves
     await Barber.updateStatus(barberId, 'available');
 
-    return { finished: true, nextClient: null };
+    return { finished: true };
+  }
+
+  // Aceita cliente que foi chamado, mudando de 'called' para 'serving' + iniciando timer
+  static async acceptClient(clientQueueId, barbershopId) {
+    const client = await Queue.findById(clientQueueId);
+    if (!client || client.barbershop_id !== barbershopId) {
+      throw createNotFoundError('Queue entry not found');
+    }
+
+    if (client.status !== 'called') {
+      throw createValidationError('Client is not in the "called" state');
+    }
+
+    // Move client from 'called' to 'serving' and start timer
+    const accepted = await Queue.acceptClient(clientQueueId);
+    if (!accepted) {
+      throw createValidationError('Failed to accept client');
+    }
+
+    const updatedClient = await Queue.findById(clientQueueId);
+    return updatedClient;
   }
 
   static async removeClient(queueId, barbershopId) {
