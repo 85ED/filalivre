@@ -1,10 +1,29 @@
 import wppconnect from '@wppconnect-team/wppconnect';
 import pool from '../config/database.js';
-import { existsSync } from 'fs';
+import path from 'path';
+import { existsSync, mkdirSync, rmSync } from 'fs';
 
 const sessions = new Map();
 // Armazena último QR gerado por sessão (acessível pelo controller)
 const qrCodes = new Map();
+// Evita corridas: múltiplos /connect simultâneos para a mesma sessão
+const startingSessions = new Map();
+
+function getUserDataDir(sessionName) {
+  const baseDir = process.env.WA_USER_DATA_DIR_BASE || '/tmp/wppconnect';
+  return path.join(baseDir, sessionName);
+}
+
+function safeRmDir(dirPath, label) {
+  try {
+    if (dirPath && existsSync(dirPath)) {
+      rmSync(dirPath, { recursive: true, force: true });
+      console.log(`[WhatsApp] ${label} removido: ${dirPath}`);
+    }
+  } catch (err) {
+    console.log(`[WhatsApp] Falha ao remover ${label} (${dirPath}): ${err.message}`);
+  }
+}
 
 // Detecta Chromium do sistema (crítico para Railway/Docker)
 // DEVE ser /usr/bin/chromium em Alpine/Linux, não fallback para bundled
@@ -38,6 +57,13 @@ function getChromiumPath() {
 }
 
 export async function startSession(sessionName) {
+  // Se já está iniciando, reutiliza a mesma promise (evita 2 Chromiums no mesmo dir)
+  if (startingSessions.has(sessionName)) {
+    console.log('[WhatsApp] startSession já em andamento, aguardando:', sessionName);
+    return startingSessions.get(sessionName);
+  }
+
+  const startPromise = (async () => {
   // Se já existe sessão ativa, destroi antes de criar nova
   if (sessions.has(sessionName)) {
     console.log('[WhatsApp] Session already exists, destroying old one:', sessionName);
@@ -56,7 +82,16 @@ export async function startSession(sessionName) {
   const chromiumPath = getChromiumPath();
   console.log('[WhatsApp] Iniciando sessão com Chromium:', chromiumPath);
 
-  const client = await wppconnect.create({
+  // CRÍTICO: userDataDir separado do diretório de tokens.
+  // Isso evita lock em /app/tokens/... e reduz chance de "browser already running".
+  const userDataDir = getUserDataDir(sessionName);
+  try {
+    mkdirSync(userDataDir, { recursive: true });
+  } catch (e) {
+    console.log(`[WhatsApp] Não foi possível criar userDataDir (${userDataDir}): ${e.message}`);
+  }
+
+  const createConfig = {
     session: sessionName,
     catchQR: (base64Qr) => {
       console.log('[WhatsApp] QR Code gerado para sessão:', sessionName);
@@ -74,6 +109,11 @@ export async function startSession(sessionName) {
     autoClose: 0,  // CRÍTICO: não fechar sessão automaticamente
     // CRÍTICO: Sempre passar browserPathExecutable, não deixar undefined
     browserPathExecutable: chromiumPath,
+    // Mantém tokens no diretório padrão (persistência), mas roda o perfil do Chromium no /tmp
+    folderNameToken: './tokens',
+    puppeteerOptions: {
+      userDataDir,
+    },
     browserArgs: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -82,12 +122,37 @@ export async function startSession(sessionName) {
       '--no-first-run',
       '--no-zygote',
     ],
-  });
+  };
+
+  let client;
+  try {
+    client = await wppconnect.create(createConfig);
+  } catch (err) {
+    const msg = String(err?.message || err);
+    // Fallback defensivo: se ainda assim travar por lock, limpa dirs e tenta 1x
+    if (msg.includes('The browser is already running')) {
+      console.log('[WhatsApp] Lock detectado ao iniciar. Limpando diretórios e tentando novamente...');
+      safeRmDir(userDataDir, 'userDataDir');
+      // Último recurso: às vezes o wppconnect usa tokens como profile; limpa também.
+      safeRmDir(path.join(process.cwd(), 'tokens', sessionName), 'tokensDir');
+      client = await wppconnect.create(createConfig);
+    } else {
+      throw err;
+    }
+  }
 
   sessions.set(sessionName, client);
 
   const qr = await qrPromise;
   return { client, qr };
+  })();
+
+  startingSessions.set(sessionName, startPromise);
+  try {
+    return await startPromise;
+  } finally {
+    startingSessions.delete(sessionName);
+  }
 }
 
 export async function startAllSessions() {
@@ -164,55 +229,45 @@ export async function disconnectSession(sessionName) {
   console.log(`[WhatsApp] Disconnecting session: ${sessionName}`);
   
   const client = sessions.get(sessionName);
-  if (!client) {
-    console.log(`[WhatsApp] Session ${sessionName} not found in memory`);
-    return;
-  }
+  const userDataDir = getUserDataDir(sessionName);
 
   try {
-    // 1. Fecha o cliente wppconnect
-    try {
-      await client.close();
-      console.log(`[WhatsApp] Client closed for ${sessionName}`);
-    } catch (e) {
-      console.log(`[WhatsApp] Error closing client (safe): ${e.message}`);
-    }
-    
-    // 2. CRÍTICO: Fecha o browser/Chromium
-    try {
-      if (client.browser) {
-        console.log(`[WhatsApp] Closing browser for ${sessionName}`);
-        await client.browser.close();
-        console.log(`[WhatsApp] Browser closed successfully`);
+    if (!client) {
+      console.log(`[WhatsApp] Session ${sessionName} not found in memory`);
+    } else {
+      // 1. Fecha o cliente wppconnect
+      try {
+        await client.close();
+        console.log(`[WhatsApp] Client closed for ${sessionName}`);
+      } catch (e) {
+        console.log(`[WhatsApp] Error closing client (safe): ${e.message}`);
       }
-    } catch (e) {
-      console.log(`[WhatsApp] Error closing browser: ${e.message}`);
+      
+      // 2. CRÍTICO: Fecha o browser/Chromium
+      try {
+        if (client.browser) {
+          console.log(`[WhatsApp] Closing browser for ${sessionName}`);
+          await client.browser.close();
+          console.log(`[WhatsApp] Browser closed successfully`);
+        }
+      } catch (e) {
+        console.log(`[WhatsApp] Error closing browser: ${e.message}`);
+      }
     }
-    
-    // 3. Remove da memória
+
+    // 3. Remove da memória (sempre)
     sessions.delete(sessionName);
     qrCodes.delete(sessionName);
-    
-    // 4. Limpa o diretório de tokens (ISSO É NOVO e CRÍTICO!)
-    try {
-      const fs = await import('fs');
-      const path = await import('path');
-      const tokensDir = path.join(process.cwd(), 'tokens', sessionName);
-      
-      if (fs.existsSync(tokensDir)) {
-        console.log(`[WhatsApp] Cleaning tokens directory: ${tokensDir}`);
-        fs.rmSync(tokensDir, { recursive: true, force: true });
-        console.log(`[WhatsApp] Tokens directory cleaned`);
-      }
-    } catch (cleanErr) {
-      console.log(`[WhatsApp] Error cleaning tokens dir (continuing): ${cleanErr.message}`);
-    }
-    
+
+    // 4. Limpa userDataDir (sempre) — onde o Chromium trava
+    safeRmDir(userDataDir, 'userDataDir');
+
     console.log(`[WhatsApp] Session ${sessionName} disconnected successfully`);
   } catch (error) {
     console.error(`[WhatsApp] Error disconnecting ${sessionName}:`, error.message);
     sessions.delete(sessionName);
     qrCodes.delete(sessionName);
+    safeRmDir(userDataDir, 'userDataDir');
   }
 }
 

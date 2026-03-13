@@ -71,13 +71,19 @@ app.post('/connect/:barbershopId', async (req, res) => {
     console.log('[WhatsApp.connect] ===== INICIANDO CONEXÃO =====');
     console.log('[WhatsApp.connect] Session:', sessionName);
 
-    // SEMPRE destruir sessão antiga primeiro
-    try {
-      console.log('[WhatsApp.connect] Tentando destruir sessão antiga...');
-      await disconnectSession(sessionName);
-      console.log('[WhatsApp.connect] ✓ Sessão antiga destruída');
-    } catch (e) {
-      console.log('[WhatsApp.connect] Nenhuma sessão antiga encontrada');
+    // Só tenta desconectar se houver sessão ativa em memória.
+    // Se a sessão estiver "iniciando" (QR já logou) mas ainda não entrou no Map,
+    // desconectar aqui causa corrida e pode disparar lock de userDataDir.
+    if (isSessionActive(sessionName)) {
+      try {
+        console.log('[WhatsApp.connect] Tentando destruir sessão ativa...');
+        await disconnectSession(sessionName);
+        console.log('[WhatsApp.connect] ✓ Sessão ativa destruída');
+      } catch (e) {
+        console.log('[WhatsApp.connect] Falha ao destruir sessão ativa (seguindo):', e?.message || e);
+      }
+    } else {
+      console.log('[WhatsApp.connect] Nenhuma sessão ativa em memória; iniciando/recuperando sessão');
     }
 
     // Criar sessão nova
