@@ -106,6 +106,8 @@ export async function startSession(sessionName) {
     },
     headless: true,
     logQR: true,
+    // Não bloquear a criação esperando login; precisamos responder /connect com o QR imediatamente
+    waitForLogin: false,
     autoClose: 0,  // CRÍTICO: não fechar sessão automaticamente
     // CRÍTICO: Sempre passar browserPathExecutable, não deixar undefined
     browserPathExecutable: chromiumPath,
@@ -124,27 +126,43 @@ export async function startSession(sessionName) {
     ],
   };
 
-  let client;
-  try {
-    client = await wppconnect.create(createConfig);
-  } catch (err) {
-    const msg = String(err?.message || err);
-    // Fallback defensivo: se ainda assim travar por lock, limpa dirs e tenta 1x
-    if (msg.includes('The browser is already running')) {
-      console.log('[WhatsApp] Lock detectado ao iniciar. Limpando diretórios e tentando novamente...');
-      safeRmDir(userDataDir, 'userDataDir');
-      // Último recurso: às vezes o wppconnect usa tokens como profile; limpa também.
-      safeRmDir(path.join(process.cwd(), 'tokens', sessionName), 'tokensDir');
-      client = await wppconnect.create(createConfig);
-    } else {
+  const createClient = async () => {
+    try {
+      return await wppconnect.create(createConfig);
+    } catch (err) {
+      const msg = String(err?.message || err);
+      // Fallback defensivo: se ainda assim travar por lock, limpa dirs e tenta 1x
+      if (msg.includes('The browser is already running')) {
+        console.log('[WhatsApp] Lock detectado ao iniciar. Limpando diretórios e tentando novamente...');
+        safeRmDir(userDataDir, 'userDataDir');
+        // Último recurso: às vezes o wppconnect usa tokens como profile; limpa também.
+        safeRmDir(path.join(process.cwd(), 'tokens', sessionName), 'tokensDir');
+        return await wppconnect.create(createConfig);
+      }
       throw err;
     }
-  }
+  };
 
-  sessions.set(sessionName, client);
+  // Dispara criação do client em background; o /connect deve responder com QR sem aguardar login.
+  const createPromise = createClient();
+  void createPromise
+    .then((client) => {
+      sessions.set(sessionName, client);
+    })
+    .catch((err) => {
+      console.error('[WhatsApp] Falha ao criar client:', err?.message || err);
+    });
 
-  const qr = await qrPromise;
-  return { client, qr };
+  // Se a criação falhar antes do QR, rejeita; se a criação apenas demorar, devolve QR assim que existir.
+  const createFailureOnly = createPromise.then(
+    () => new Promise(() => {}),
+    (err) => {
+      throw err;
+    }
+  );
+
+  const qr = await Promise.race([qrPromise, createFailureOnly]);
+  return { client: sessions.get(sessionName) || null, qr };
   })();
 
   startingSessions.set(sessionName, startPromise);
