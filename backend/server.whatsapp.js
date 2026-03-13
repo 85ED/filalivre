@@ -68,31 +68,49 @@ app.post('/connect/:barbershopId', async (req, res) => {
     const { barbershopId } = req.params;
     const sessionName = 'barbershop_' + barbershopId;
 
-    console.log('[WhatsApp.connect] restarting session:', sessionName);
+    console.log('[WhatsApp.connect] ===== INICIANDO CONEXÃO =====');
+    console.log('[WhatsApp.connect] Session:', sessionName);
 
-    // Disconnect old session if exists (handles cleanup of client + browser)
+    // SEMPRE destruir sessão antiga primeiro
     try {
+      console.log('[WhatsApp.connect] Tentando destruir sessão antiga...');
       await disconnectSession(sessionName);
-      console.log('[WhatsApp.connect] old session destroyed');
+      console.log('[WhatsApp.connect] ✓ Sessão antiga destruída');
     } catch (e) {
-      console.log('[WhatsApp.connect] no previous session, creating new');
+      console.log('[WhatsApp.connect] Nenhuma sessão antiga encontrada');
     }
 
-    // Create fresh session
-    console.log('[WhatsApp.connect] creating new session:', sessionName);
+    // Criar sessão nova
+    console.log('[WhatsApp.connect] Criando nova sessão...');
     const { qr } = await startSession(sessionName);
     
-    console.log('[WhatsApp.connect] QR generated:', qr ? 'yes' : 'no');
-    await registerSession(barbershopId, qr ? 'waiting_qr' : 'connected');
+    if (!qr) {
+      console.error('[WhatsApp.connect] ❌ QR não foi gerado!');
+      return res.status(500).json({ error: 'QR não foi gerado' });
+    }
 
+    console.log('[WhatsApp.connect] ✓ QR gerado com sucesso');
+    console.log('[WhatsApp.connect] QR (primeiros 50 chars):', qr.substring(0, 50) + '...');
+    
+    // Registrar no banco
+    await registerSession(barbershopId, 'waiting_qr');
+    console.log('[WhatsApp.connect] ✓ Sessão registrada no banco');
+
+    // RETORNAR QR PARA O FRONTEND
     return res.json({
       success: true,
-      status: qr ? 'waiting_qr' : 'connected',
-      qr: qr || null,
+      status: 'waiting_qr',
+      qr: qr,
     });
+
   } catch (err) {
-    console.error('[WhatsApp.connect] erro:', err.message);
-    return res.status(500).json({ error: 'Erro ao iniciar sessão WhatsApp' });
+    console.error('[WhatsApp.connect] ❌ ERRO CRÍTICO:', err.message);
+    console.error('[WhatsApp.connect] Stack:', err.stack);
+    
+    return res.status(500).json({ 
+      error: 'Erro ao iniciar sessão WhatsApp',
+      details: err.message 
+    });
   }
 });
 

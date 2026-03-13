@@ -170,35 +170,47 @@ export async function disconnectSession(sessionName) {
   }
 
   try {
-    // 1. Fecha o cliente WhatsApp
+    // 1. Fecha o cliente wppconnect
     try {
       await client.close();
       console.log(`[WhatsApp] Client closed for ${sessionName}`);
     } catch (e) {
-      console.log(`[WhatsApp] Error closing client (usually safe): ${e.message}`);
+      console.log(`[WhatsApp] Error closing client (safe): ${e.message}`);
     }
     
-    // 2. Fecha o browser explicitamente (ISSO É CRÍTICO!)
+    // 2. CRÍTICO: Fecha o browser/Chromium
     try {
       if (client.browser) {
         console.log(`[WhatsApp] Closing browser for ${sessionName}`);
         await client.browser.close();
-        console.log(`[WhatsApp] Browser closed successfully for ${sessionName}`);
+        console.log(`[WhatsApp] Browser closed successfully`);
       }
     } catch (e) {
-      console.log(`[WhatsApp] Error closing browser (continuing anyway): ${e.message}`);
+      console.log(`[WhatsApp] Error closing browser: ${e.message}`);
     }
     
-    // 3. Remove da memória (SEMPRE, mesmo com erro)
+    // 3. Remove da memória
     sessions.delete(sessionName);
-    
-    // 4. Limpa QR code
     qrCodes.delete(sessionName);
+    
+    // 4. Limpa o diretório de tokens (ISSO É NOVO e CRÍTICO!)
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      const tokensDir = path.join(process.cwd(), 'tokens', sessionName);
+      
+      if (fs.existsSync(tokensDir)) {
+        console.log(`[WhatsApp] Cleaning tokens directory: ${tokensDir}`);
+        fs.rmSync(tokensDir, { recursive: true, force: true });
+        console.log(`[WhatsApp] Tokens directory cleaned`);
+      }
+    } catch (cleanErr) {
+      console.log(`[WhatsApp] Error cleaning tokens dir (continuing): ${cleanErr.message}`);
+    }
     
     console.log(`[WhatsApp] Session ${sessionName} disconnected successfully`);
   } catch (error) {
-    console.error(`[WhatsApp] Unexpected error disconnecting ${sessionName}:`, error.message);
-    // Mesmo com erro, tenta remover da memória para evitar locks
+    console.error(`[WhatsApp] Error disconnecting ${sessionName}:`, error.message);
     sessions.delete(sessionName);
     qrCodes.delete(sessionName);
   }
