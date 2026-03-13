@@ -9,6 +9,7 @@ router.post('/join', QueueController.join);
 router.get('/recover', QueueController.recover); // Must be before /:barbershopId to avoid conflict
 router.get('/:barbershopId', QueueController.getQueue);
 router.post('/call-next', QueueController.callNext);
+router.post('/accept', QueueController.acceptClient);
 router.post('/finish', QueueController.finishClient);
 router.post('/remove', QueueController.remove);
 router.post('/skip', QueueController.skip);

@@ -11,6 +11,7 @@ export const API_ENDPOINTS = {
   joinQueue: '/queue/join',
   removeFromQueue: '/queue/remove',
   callNext: '/queue/call-next',
+  acceptClient: '/queue/accept',
   finishClient: '/queue/finish',
   skipClient: '/queue/skip',
   

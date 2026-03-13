@@ -133,6 +133,20 @@ export function getLastQR(sessionName) {
   return qrCodes.get(sessionName) || null;
 }
 
+function formatWhatsAppJid(phoneOrJid) {
+  if (!phoneOrJid) return null;
+  const raw = String(phoneOrJid).trim();
+  if (!raw) return null;
+
+  // Se já vier como JID, respeita
+  if (raw.includes('@')) return raw;
+
+  let number = raw.replace(/\D/g, '');
+  if (!number) return null;
+  if (!number.startsWith('55')) number = `55${number}`;
+  return `${number}@c.us`;
+}
+
 export async function sendMessage(sessionName, phone, message) {
   const client = sessions.get(sessionName);
 
@@ -140,11 +154,12 @@ export async function sendMessage(sessionName, phone, message) {
     throw new Error('Sessão WhatsApp não encontrada: ' + sessionName);
   }
 
-  // Formata número: remove caracteres não-numéricos e adiciona @c.us
-  const cleanPhone = phone.replace(/\D/g, '');
-  const number = cleanPhone + '@c.us';
+  const jid = formatWhatsAppJid(phone);
+  if (!jid) {
+    throw new Error('Telefone inválido para WhatsApp');
+  }
 
-  return client.sendText(number, message);
+  return client.sendText(jid, message);
 }
 
 export function isSessionActive(sessionName) {

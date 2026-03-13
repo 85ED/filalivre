@@ -3,6 +3,14 @@ import Barber from '../models/Barber.js';
 import { createValidationError, createNotFoundError } from '../middlewares/validators.js';
 import WhatsAppNotificationService from './WhatsAppNotificationService.js';
 
+function normalizeBrPhoneDigits(phone) {
+  if (!phone) return null;
+  const digits = String(phone).replace(/\D/g, '');
+  if (!digits) return null;
+  if (digits.startsWith('55')) return digits;
+  return `55${digits}`;
+}
+
 export class QueueService {
   static async joinQueue(barbershopId, clientName, clientIp = null, barberId = null, phone = null) {
     if (!clientName || clientName.trim() === '') {
@@ -21,7 +29,7 @@ export class QueueService {
       const queueData = await Queue.create({
         barbershop_id: barbershopId,
         name: clientName.trim(),
-        phone: phone ? phone.trim() : null,
+        phone: normalizeBrPhoneDigits(phone),
         client_ip: clientIp,
         barber_id: barberId,
       });
@@ -76,8 +84,7 @@ export class QueueService {
       return null; // No waiting clients
     }
 
-    // Update barber status to serving
-    await Barber.updateStatus(barberId, 'serving');
+    // Marca o cliente como "called" e vincula no barbeiro (ainda não é atendimento)
     await Barber.setCurrentClient(barberId, clientQueueId);
 
     const client = await Queue.findById(clientQueueId);
@@ -110,18 +117,37 @@ export class QueueService {
     await Queue.updateStatus(barber.current_client_id, 'finished');
     await Barber.setCurrentClient(barberId, null);
 
-    // Try to call next client
-    const nextClientId = await Queue.callNext(barbershopId, barberId);
-    if (nextClientId) {
-      await Barber.setCurrentClient(barberId, nextClientId);
-      const nextClient = await Queue.findById(nextClientId);
-      return { finished: true, nextClient };
+    // NÃO chama próximo automaticamente — barbeiro mantém controle do fluxo
+    await Barber.updateStatus(barberId, 'available');
+    return { finished: true, nextClient: null };
+  }
+
+  static async acceptClient(barbershopId, barberId) {
+    const barber = await Barber.findById(barberId);
+    if (!barber || barber.barbershop_id !== barbershopId) {
+      throw createValidationError('Barber not found or does not belong to this barbershop');
     }
 
-    // No more clients, set barber to available
-    await Barber.updateStatus(barberId, 'available');
+    if (!barber.current_client_id) {
+      throw createValidationError('Barber has no current client');
+    }
 
-    return { finished: true, nextClient: null };
+    const client = await Queue.findById(barber.current_client_id);
+    if (!client || client.barbershop_id !== barbershopId) {
+      throw createNotFoundError('Queue entry not found');
+    }
+
+    if (client.status !== 'called') {
+      throw createValidationError('Client is not in called state');
+    }
+
+    const ok = await Queue.acceptCalledClient(client.id, barberId);
+    if (!ok) {
+      throw createValidationError('Failed to accept client');
+    }
+
+    await Barber.updateStatus(barberId, 'serving');
+    return await Queue.findById(client.id);
   }
 
   static async removeClient(queueId, barbershopId) {

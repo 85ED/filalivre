@@ -46,11 +46,11 @@ app.get('/ready', (req, res) => {
 // POST /send — called by worker to send a message
 app.post('/send', async (req, res) => {
   try {
-    const { barbershopId, phone, message } = req.body;
-    if (!barbershopId || !phone || !message) {
-      return res.status(400).json({ error: 'barbershopId, phone e message são obrigatórios' });
+    const { barbershopId, session, phone, message } = req.body;
+    const sessionName = session || (barbershopId ? 'barbershop_' + barbershopId : null);
+    if (!sessionName || !phone || !message) {
+      return res.status(400).json({ error: 'session (ou barbershopId), phone e message são obrigatórios' });
     }
-    const sessionName = 'barbershop_' + barbershopId;
     if (!isSessionActive(sessionName)) {
       return res.status(404).json({ error: 'Sessão WhatsApp não ativa para este estabelecimento' });
     }

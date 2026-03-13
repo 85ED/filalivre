@@ -188,4 +188,24 @@ export const queueService = {
       throw error;
     }
   },
+
+  async acceptClient(
+    barberId: string,
+    barbershopId: number
+  ): Promise<QueueItem> {
+    try {
+      const response = await api.post<{ client: BackendQueueItem }>(
+        API_ENDPOINTS.acceptClient,
+        {
+          barberId: parseInt(barberId),
+          barbershopId,
+        }
+      );
+
+      return mapBackendQueueItem(response.client);
+    } catch (error) {
+      console.error('Failed to accept client:', error);
+      throw error;
+    }
+  },
 };

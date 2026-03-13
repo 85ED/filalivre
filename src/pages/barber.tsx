@@ -23,6 +23,7 @@ export function BarberPage() {
   const [barberStatus, setBarberStatus] = useState<'available' | 'serving' | 'paused'>('available');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [justFinished, setJustFinished] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [statsData, setStatsData] = useState<{ today: ReportsData | null; month: ReportsData | null; clients: BarberClientData | null }>({ today: null, month: null, clients: null });
   const [statsLoading, setStatsLoading] = useState(false);
@@ -72,13 +73,18 @@ export function BarberPage() {
     (q) => !q.barberId && q.status === 'waiting'
   );
 
-  // Próximo cliente para este barbeiro (prioridade: fila específica > fila geral)
-  const nextClient = barberQueue[0] || generalQueue[0] || null;
-
   // Cliente sendo atendido por este barbeiro
   const currentClient = queue.find(
     (q) => q.barberId === LOGGED_BARBER_ID && (q.status === 'serving' || q.status === 'called')
   );
+
+  const hasWaitingClients = barberQueue.length > 0 || generalQueue.length > 0;
+
+  useEffect(() => {
+    if (currentClient) {
+      setJustFinished(false);
+    }
+  }, [currentClient]);
 
   const openStatsModal = async () => {
     setShowStats(true);
@@ -102,13 +108,27 @@ export function BarberPage() {
     setError(null);
     try {
       const next = await queueService.callNext(LOGGED_BARBER_ID!, barbershopId);
-      if (next) {
-        setBarberStatus('serving');
-      }
+      if (next) setJustFinished(false);
       await refetchQueue();
     } catch (err) {
       console.error('Failed to call next:', err);
       setError('Erro ao chamar próximo cliente');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAccept = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await queueService.acceptClient(LOGGED_BARBER_ID!, barbershopId);
+      setBarberStatus('serving');
+      setJustFinished(false);
+      await refetchQueue();
+    } catch (err) {
+      console.error('Failed to accept client:', err);
+      setError('Erro ao aceitar cliente');
     } finally {
       setLoading(false);
     }
@@ -120,6 +140,7 @@ export function BarberPage() {
     try {
       await queueService.finishClient(LOGGED_BARBER_ID!, barbershopId);
       setBarberStatus('available');
+      setJustFinished(true);
       await refetchQueue();
     } catch (err) {
       console.error('Failed to finish client:', err);
@@ -176,7 +197,7 @@ export function BarberPage() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const serveTime = currentClient
+  const serveTime = currentClient && currentClient.status === 'serving'
     ? Math.max(0, Math.floor((Date.now() - new Date(currentClient.serviceStartTime || currentClient.createdAt).getTime()) / 1000))
     : 0;
 
@@ -252,8 +273,8 @@ export function BarberPage() {
           </motion.div>
         )}
 
-        {/* ATENDENDO AGORA */}
-        {currentClient && (
+        {/* ATENDENDO AGORA (serving) */}
+        {currentClient?.status === 'serving' && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -300,8 +321,8 @@ export function BarberPage() {
           </motion.div>
         )}
 
-        {/* PRÓXIMO CLIENTE */}
-        {!currentClient && (
+        {/* PRÓXIMO (called) */}
+        {currentClient?.status === 'called' && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -310,27 +331,56 @@ export function BarberPage() {
             <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-500 mb-4">
               Próximo cliente
             </h2>
-            {nextClient ? (
-              <div className="bg-blue-50 rounded-xl p-5 space-y-4 border border-blue-200">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
-                    <User className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-blue-600">Próxima pessoa</p>
-                    <p className="text-lg font-black text-neutral-900">{nextClient.name}</p>
-                  </div>
+            <div className="bg-blue-50 rounded-xl p-5 space-y-4 border border-blue-200">
+              <div className="text-center">
+                <div className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center mx-auto mb-3">
+                  <User className="w-7 h-7 text-white" />
                 </div>
+                <p className="text-2xl font-black text-neutral-900">{currentClient.name}</p>
+              </div>
 
+              <div className="grid grid-cols-2 gap-3">
                 <Button
-                  onClick={handleCallNext}
+                  onClick={handleAccept}
                   disabled={loading || barberStatus === 'paused'}
-                  className="w-full h-11 bg-blue-600 hover:bg-blue-700 disabled:bg-neutral-300 text-white font-semibold rounded-lg"
+                  className="h-11 bg-blue-600 hover:bg-blue-700 disabled:bg-neutral-300 text-white font-semibold rounded-lg text-sm"
                 >
-                  <Play className="w-4 h-4 mr-2" />
-                  Chamar próximo
+                  <CircleCheck className="w-4 h-4 mr-2" />
+                  Aceitar
+                </Button>
+                <Button
+                  onClick={() => handleSkip(currentClient.id)}
+                  disabled={loading}
+                  className="h-11 bg-red-50 hover:bg-red-100 text-red-600 font-semibold rounded-lg border border-red-200 text-sm"
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Pular
                 </Button>
               </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* NENHUM ATENDIMENTO ATIVO */}
+        {!currentClient && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl p-5 shadow-sm border border-neutral-200"
+          >
+            <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-500 mb-4">
+              {justFinished ? 'Atendimento finalizado' : 'Nenhum atendimento ativo'}
+            </h2>
+
+            {hasWaitingClients ? (
+              <Button
+                onClick={handleCallNext}
+                disabled={loading || barberStatus === 'paused'}
+                className="w-full h-11 bg-blue-600 hover:bg-blue-700 disabled:bg-neutral-300 text-white font-semibold rounded-lg"
+              >
+                <Play className="w-4 h-4 mr-2" />
+                Chamar próximo
+              </Button>
             ) : (
               <div className="text-center py-8 px-4 text-neutral-500 bg-neutral-50 rounded-xl border border-neutral-200">
                 <p className="text-sm font-semibold">Nenhum cliente na fila</p>

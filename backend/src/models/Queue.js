@@ -158,16 +158,62 @@ export class Queue {
 
       const clientId = clients[0].id;
 
-      // Atualiza status para serving e atribui ao barbeiro
+      // Atualiza status para called e atribui ao barbeiro (não inicia atendimento ainda)
       await connection.query(
         `UPDATE queue 
-         SET status = 'serving', barber_id = ?, service_start_time = NOW(), updated_at = NOW()
+         SET status = 'called', barber_id = ?, updated_at = NOW()
          WHERE id = ?`,
         [barberId, clientId]
       );
 
       await connection.commit();
       return clientId;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  static async acceptCalledClient(clientQueueId, barberId) {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [rows] = await connection.query(
+        `SELECT id, status, barber_id
+         FROM queue
+         WHERE id = ?
+         FOR UPDATE`,
+        [clientQueueId]
+      );
+
+      const row = rows[0];
+      if (!row) {
+        await connection.commit();
+        return false;
+      }
+
+      if (row.status !== 'called') {
+        await connection.commit();
+        return false;
+      }
+
+      if (String(row.barber_id) !== String(barberId)) {
+        await connection.commit();
+        return false;
+      }
+
+      await connection.query(
+        `UPDATE queue
+         SET status = 'serving', service_start_time = NOW(), updated_at = NOW()
+         WHERE id = ?`,
+        [clientQueueId]
+      );
+
+      await connection.commit();
+      return true;
     } catch (error) {
       await connection.rollback();
       throw error;
