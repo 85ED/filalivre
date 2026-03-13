@@ -1010,18 +1010,28 @@ export function AdminPage() {
                       </button>
                     </>
                   ) : waStatus === 'waiting_qr' || waStatus === 'connecting' ? (
-                    <button
-                      onClick={handleWaConnect}
-                      disabled={waLoading}
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-50 text-amber-700 font-semibold text-sm hover:bg-amber-100 transition-colors disabled:opacity-50"
-                    >
-                      {waLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <RefreshCw className="w-4 h-4" />
-                      )}
-                      Gerar novo QR
-                    </button>
+                    <>
+                      <button
+                        onClick={handleWaConnect}
+                        disabled={waLoading}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-50 text-amber-700 font-semibold text-sm hover:bg-amber-100 transition-colors disabled:opacity-50"
+                      >
+                        {waLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-4 h-4" />
+                        )}
+                        Gerar novo QR
+                      </button>
+                      <button
+                        onClick={handleWaDisconnect}
+                        disabled={waLoading}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-neutral-100 text-neutral-700 font-semibold text-sm hover:bg-neutral-200 transition-colors disabled:opacity-50"
+                      >
+                        <WifiOff className="w-4 h-4" />
+                        Cancelar
+                      </button>
+                    </>
                   ) : (
                     <button
                       onClick={handleWaConnect}
