@@ -171,7 +171,12 @@ app.use('/api/whatsapp', async (req, res, next) => {
   // Skip proxy for local routes handled by whatsappRoutes
   if (
     (relativePath.startsWith('/usage') && req.method === 'GET') ||
-    (relativePath.startsWith('/buy-credits') && req.method === 'POST')
+    (relativePath.startsWith('/buy-credits') && req.method === 'POST') ||
+    (relativePath.startsWith('/start') && req.method === 'POST') ||
+    (relativePath.startsWith('/connect') && req.method === 'POST') ||
+    (relativePath.startsWith('/disconnect') && req.method === 'POST') ||
+    (relativePath.startsWith('/status') && req.method === 'GET') ||
+    (relativePath.startsWith('/qr') && req.method === 'GET')
   ) {
     return next();
   }
