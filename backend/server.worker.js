@@ -60,7 +60,7 @@ async function checkQueueAlerts() {
     }
 
     let sentCount = 0;
-    let skippedAhead = 0;
+    let skippedPosition = 0;
     let skippedInactive = 0;
     let skippedBadPosition = 0;
     let errorCount = 0;
@@ -76,6 +76,12 @@ async function checkQueueAlerts() {
         continue;
       }
 
+      // Regra: enviar apenas para o cliente na posição 3
+      if (Number(client.position) !== 3) {
+        skippedPosition++;
+        continue;
+      }
+
       const [ahead] = await pool.query(
         `SELECT COUNT(*) as cnt FROM queue
          WHERE barbershop_id = ?
@@ -85,15 +91,6 @@ async function checkQueueAlerts() {
       );
 
       const peopleAhead = ahead[0].cnt;
-      if (peopleAhead > 3) {
-        skippedAhead++;
-        if (DEBUG) {
-          console.log(
-            `[Worker] Skip: ${client.name} (id=${client.id}) peopleAhead=${peopleAhead} > 3`
-          );
-        }
-        continue;
-      }
 
       // Check if WhatsApp session is active via HTTP
       const sessionActive = await checkWhatsAppStatus(client.barbershop_id);
@@ -155,7 +152,7 @@ async function checkQueueAlerts() {
     }
 
     console.log(
-      `[Worker] Summary: candidates=${candidates.length} sent=${sentCount} skippedAhead=${skippedAhead} skippedInactive=${skippedInactive} skippedBadPosition=${skippedBadPosition} errors=${errorCount}`
+      `[Worker] Summary: candidates=${candidates.length} sent=${sentCount} skippedPosition=${skippedPosition} skippedInactive=${skippedInactive} skippedBadPosition=${skippedBadPosition} errors=${errorCount}`
     );
   } catch (err) {
     console.error('[Worker] Erro ao verificar alertas:', err.message);

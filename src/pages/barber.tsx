@@ -299,7 +299,7 @@ export function BarberPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 <Button
                   onClick={handleFinish}
                   disabled={loading}
@@ -307,14 +307,6 @@ export function BarberPage() {
                 >
                   <CircleCheck className="w-4 h-4 mr-2" />
                   Finalizar
-                </Button>
-                <Button
-                  onClick={() => handleSkip(currentClient.id)}
-                  disabled={loading}
-                  className="h-11 bg-red-50 hover:bg-red-100 text-red-600 font-semibold rounded-lg border border-red-200 text-sm"
-                >
-                  <X className="w-4 h-4 mr-2" />
-                  Pular
                 </Button>
               </div>
             </div>

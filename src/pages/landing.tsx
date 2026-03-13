@@ -3,12 +3,13 @@ import { BackgroundPaths } from '@/components/ui/background-paths';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowRight, Smartphone, Eye, Bell, CircleCheck as CheckCircle, User, LogIn, X, Loader2, AlertCircle, ChevronDown, DollarSign, Shield, Zap, Users, BarChart3, MessageCircle } from 'lucide-react';
+import { ArrowRight, Smartphone, Eye, Bell, CircleCheck as CheckCircle, LogIn, X, Loader2, AlertCircle, ChevronDown, Shield, Users, BarChart3, MessageCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { FilaLivreLogo } from '@/components/ui/filalivre-logo';
 import { useAuth } from '@/hooks';
 import { ProjectsSection } from '@/components/ProjectsSection';
+import { api } from '@/services/api';
 
 export function LandingPage() {
   const title = 'Sistema de Gestão de Filas para Atendimento Presencial';
@@ -31,11 +32,11 @@ export function LandingPage() {
 
   useEffect(() => {
     document.title = 'FilaLivre — Sistema de Gestão de Filas | Fila Virtual pelo Celular';
-    // Fetch public price from backend
-    fetch('/api/barbershops/public-price')
-      .then(res => res.json())
-      .then(data => setPublicPrice(Math.round(data.priceCents / 100)))
-      .catch(() => setPublicPrice(35)) // fallback to 35
+
+    api
+      .get<{ priceCents: number }>('/barbershops/public-price')
+      .then((data) => setPublicPrice(Math.round(data.priceCents / 100)))
+      .catch(() => setPublicPrice(35))
       .finally(() => setPriceLoading(false));
   }, []);
 
