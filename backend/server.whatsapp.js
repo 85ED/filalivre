@@ -17,7 +17,13 @@ const PORT = process.env.WHATSAPP_PORT || 3003;
 app.use(express.json());
 
 function formatPhone(phone) {
-  let number = String(phone || '').replace(/\D/g, '');
+  const raw = String(phone || '').trim();
+  if (!raw) return null;
+
+  // Se já vier no formato JID, respeita
+  if (raw.includes('@')) return raw;
+
+  let number = raw.replace(/\D/g, '');
   if (!number) return null;
   if (!number.startsWith('55')) number = '55' + number;
   return number + '@c.us';
@@ -70,7 +76,23 @@ app.post('/send', async (req, res) => {
       return res.status(400).json({ error: 'Telefone inválido para WhatsApp' });
     }
 
-    await client.sendText(jid, message);
+    try {
+      await client.sendText(jid, message);
+    } catch (err) {
+      const details = String(err?.message || err);
+      // Em sessões multi-device, alguns destinatários precisam de LID
+      if (details.toLowerCase().includes('no lid for user') && typeof client.getPnLidEntry === 'function') {
+        const info = await client.getPnLidEntry(jid).catch(() => null);
+        const lid = info?.lid?._serialized;
+        if (lid) {
+          await client.sendText(lid, message);
+        } else {
+          throw err;
+        }
+      } else {
+        throw err;
+      }
+    }
     res.json({ success: true, message: 'Mensagem enviada' });
   } catch (err) {
     console.error('[WhatsApp] Erro ao enviar:', err.message);
