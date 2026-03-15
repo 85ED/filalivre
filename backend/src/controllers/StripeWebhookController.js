@@ -61,11 +61,14 @@ async function handleCheckoutCompleted(session) {
 
   if (!barbershopId || !subId) return;
 
-  await Barbershop.update(parseInt(barbershopId), {
+  const id = parseInt(barbershopId);
+  const ok = await Barbershop.update(id, {
     stripe_subscription_id: subId,
     subscription_status: 'active',
+    status_assinatura: 'ativa',
+    ativo: 1,
   });
-  console.log(`[Stripe] Checkout completed: barbershop ${barbershopId}`);
+  console.log(`[Stripe][checkout.session.completed] event=checkout.session.completed subscription_id=${subId} empresa_id=${barbershopId} result=${ok ? 'updated' : 'no_change'}`);
 }
 
 /**
@@ -113,49 +116,195 @@ async function handleWhatsAppCreditsPurchase(session) {
 }
 
 async function handlePaymentSucceeded(invoice) {
-  if (!invoice.subscription) return;
+  const subscriptionId = typeof invoice.subscription === 'string'
+    ? invoice.subscription
+    : invoice.subscription?.id;
+  if (!subscriptionId) return;
+
+  const attemptCount = Number(invoice.attempt_count || 0);
+  const paidAt = invoice.status_transitions?.paid_at
+    ? new Date(invoice.status_transitions.paid_at * 1000)
+    : new Date();
+
   const [rows] = await pool.query(
     'SELECT id FROM barbershops WHERE stripe_subscription_id = ? LIMIT 1',
-    [invoice.subscription]
+    [subscriptionId]
   );
-  if (rows.length > 0) {
-    await Barbershop.update(rows[0].id, { subscription_status: 'active' });
-    console.log(`[Stripe] Payment succeeded: barbershop ${rows[0].id}`);
+
+  let barbershopId = rows?.[0]?.id;
+  if (!barbershopId) {
+    try {
+      const sub = await StripeService.retrieveSubscription(subscriptionId);
+      const metaId = parseInt(sub?.metadata?.barbershop_id);
+      if (metaId) barbershopId = metaId;
+    } catch (e) {
+      // ignore
+    }
   }
+
+  if (!barbershopId) {
+    console.log(`[Stripe][invoice.payment_succeeded] event=invoice.payment_succeeded subscription_id=${subscriptionId} empresa_id=unknown attempt_count=${attemptCount} result=barbershop_not_found`);
+    return;
+  }
+
+  const ok = await Barbershop.update(barbershopId, {
+    subscription_status: 'active',
+    status_assinatura: 'ativa',
+    ativo: 1,
+    data_ultimo_pagamento: paidAt,
+    stripe_invoice_id: invoice.id,
+    tentativas_pagamento: 0,
+    proxima_tentativa_pagamento: null,
+  });
+
+  console.log(`[Stripe][invoice.payment_succeeded] event=invoice.payment_succeeded subscription_id=${subscriptionId} empresa_id=${barbershopId} attempt_count=${attemptCount} result=${ok ? 'updated' : 'no_change'}`);
 }
 
 async function handlePaymentFailed(invoice) {
-  if (!invoice.subscription) return;
+  const subscriptionId = typeof invoice.subscription === 'string'
+    ? invoice.subscription
+    : invoice.subscription?.id;
+  if (!subscriptionId) return;
+
+  const attemptCount = Number(invoice.attempt_count || 0);
+  const nextAttemptAt = invoice.next_payment_attempt
+    ? new Date(invoice.next_payment_attempt * 1000)
+    : null;
+
   const [rows] = await pool.query(
-    'SELECT id FROM barbershops WHERE stripe_subscription_id = ? LIMIT 1',
-    [invoice.subscription]
+    'SELECT id, email, owner_name, name FROM barbershops WHERE stripe_subscription_id = ? LIMIT 1',
+    [subscriptionId]
   );
-  if (rows.length > 0) {
-    await Barbershop.update(rows[0].id, { subscription_status: 'expired' });
-    console.log(`[Stripe] Payment failed: barbershop ${rows[0].id}`);
+
+  let barbershop = rows?.[0];
+  if (!barbershop) {
+    try {
+      const sub = await StripeService.retrieveSubscription(subscriptionId);
+      const metaId = parseInt(sub?.metadata?.barbershop_id);
+      if (metaId) {
+        const [fallback] = await pool.query(
+          'SELECT id, email, owner_name, name FROM barbershops WHERE id = ? LIMIT 1',
+          [metaId]
+        );
+        barbershop = fallback?.[0];
+      }
+    } catch (e) {
+      // ignore
+    }
   }
+
+  if (!barbershop?.id) {
+    console.log(`[Stripe][invoice.payment_failed] event=invoice.payment_failed subscription_id=${subscriptionId} empresa_id=unknown attempt_count=${attemptCount} next_payment_attempt=${nextAttemptAt ? nextAttemptAt.toISOString() : 'null'} result=barbershop_not_found`);
+    return;
+  }
+
+  if (attemptCount < 3) {
+    // manter conta ativa e avisar usuário
+    const ok = await Barbershop.update(barbershop.id, {
+      subscription_status: 'active',
+      status_assinatura: 'ativa',
+      ativo: 1,
+      tentativas_pagamento: attemptCount,
+      proxima_tentativa_pagamento: nextAttemptAt,
+    });
+
+    notifyPaymentFailure(barbershop, { attemptCount, nextAttemptAt }).catch(() => {});
+
+    console.log(`[Stripe][invoice.payment_failed] event=invoice.payment_failed subscription_id=${subscriptionId} empresa_id=${barbershop.id} attempt_count=${attemptCount} next_payment_attempt=${nextAttemptAt ? nextAttemptAt.toISOString() : 'null'} result=${ok ? 'warned_active' : 'warned_active_no_change'}`);
+    return;
+  }
+
+  // attempt_count >= 3 => bloquear
+  const ok = await Barbershop.update(barbershop.id, {
+    subscription_status: 'expired',
+    status_assinatura: 'pendente_bloqueado',
+    ativo: 0,
+    tentativas_pagamento: attemptCount,
+    proxima_tentativa_pagamento: nextAttemptAt,
+  });
+
+  console.log(`[Stripe][invoice.payment_failed] event=invoice.payment_failed subscription_id=${subscriptionId} empresa_id=${barbershop.id} attempt_count=${attemptCount} next_payment_attempt=${nextAttemptAt ? nextAttemptAt.toISOString() : 'null'} result=${ok ? 'blocked' : 'blocked_no_change'}`);
 }
 
 async function handleSubscriptionUpdated(subscription) {
   const barbershopId = subscription.metadata?.barbershop_id;
   if (!barbershopId) return;
 
-  const statusMap = { active: 'active', past_due: 'expired', unpaid: 'expired', canceled: 'cancelled' };
-  await Barbershop.update(parseInt(barbershopId), {
-    subscription_status: statusMap[subscription.status] || 'expired',
+  const id = parseInt(barbershopId);
+  const stripeStatus = subscription.status;
+  const subscriptionStatusMap = {
+    active: 'active',
+    trialing: 'trial',
+    past_due: 'expired',
+    unpaid: 'expired',
+    canceled: 'cancelled',
+    incomplete_expired: 'expired',
+  };
+  const statusAssinaturaMap = {
+    active: 'ativa',
+    trialing: 'ativa',
+    past_due: 'ativa',
+    unpaid: 'pendente_bloqueado',
+    canceled: 'cancelada',
+    incomplete_expired: 'pendente_bloqueado',
+  };
+  const ativoMap = {
+    active: 1,
+    trialing: 1,
+    past_due: 1,
+    unpaid: 0,
+    canceled: 0,
+    incomplete_expired: 0,
+  };
+
+  const ok = await Barbershop.update(id, {
+    subscription_status: subscriptionStatusMap[stripeStatus] || 'expired',
+    status_assinatura: statusAssinaturaMap[stripeStatus] || 'pendente_bloqueado',
+    ativo: ativoMap[stripeStatus] ?? 0,
+    stripe_subscription_id: subscription.id,
   });
-  console.log(`[Stripe] Subscription updated: barbershop ${barbershopId} → ${subscription.status}`);
+  console.log(`[Stripe][customer.subscription.updated] event=customer.subscription.updated subscription_id=${subscription.id} empresa_id=${id} result=${ok ? 'updated' : 'no_change'} stripe_status=${stripeStatus}`);
 }
 
 async function handleSubscriptionDeleted(subscription) {
   const barbershopId = subscription.metadata?.barbershop_id;
   if (!barbershopId) return;
 
-  await Barbershop.update(parseInt(barbershopId), {
+  const id = parseInt(barbershopId);
+  const ok = await Barbershop.update(id, {
     subscription_status: 'cancelled',
+    status_assinatura: 'cancelada',
+    ativo: 0,
     stripe_subscription_id: null,
   });
-  console.log(`[Stripe] Subscription deleted: barbershop ${barbershopId}`);
+  console.log(`[Stripe][customer.subscription.deleted] event=customer.subscription.deleted subscription_id=${subscription.id} empresa_id=${id} result=${ok ? 'updated' : 'no_change'}`);
+}
+
+async function notifyPaymentFailure(barbershop, { attemptCount, nextAttemptAt }) {
+  const email = barbershop.email;
+  if (!email || !process.env.SENDGRID_API_KEY) return;
+
+  const sgMail = (await import('@sendgrid/mail')).default;
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+  const next = nextAttemptAt ? new Date(nextAttemptAt).toLocaleString('pt-BR') : 'em breve';
+  const subject = `FilaLivre — Falha no pagamento (tentativa ${attemptCount})`;
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+      <h2 style="margin:0 0 12px;">Falha no pagamento da assinatura</h2>
+      <p style="margin:0 0 8px;">Identificamos uma falha no pagamento da sua assinatura.</p>
+      <p style="margin:0 0 8px;"><strong>Tentativa:</strong> ${attemptCount} (de 3)</p>
+      <p style="margin:0 0 8px;"><strong>Próxima tentativa:</strong> ${next}</p>
+      <p style="margin:16px 0 0;">Você pode atualizar seu método de pagamento no portal de cobrança.</p>
+    </div>
+  `;
+
+  await sgMail.send({
+    to: email,
+    from: 'no-reply@filalivre.app.br',
+    subject,
+    html,
+  });
 }
 
 export default StripeWebhookController;

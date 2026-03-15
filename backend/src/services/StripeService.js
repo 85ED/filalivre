@@ -1,7 +1,9 @@
 import Stripe from 'stripe';
 
 const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY)
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: process.env.STRIPE_API_VERSION || undefined,
+    })
   : null;
 
 export class StripeService {
@@ -18,8 +20,21 @@ export class StripeService {
     });
   }
 
-  static async createCheckoutSession({ customerId, customerEmail, seatPriceCents, seatQuantity, barbershopId, successUrl, cancelUrl }) {
+  static async createCheckoutSession({ customerId, customerEmail, seatPriceCents, seatQuantity, barbershopId, successUrl, cancelUrl, metadata = {} }) {
     if (!stripe) throw new Error('Stripe não configurado');
+
+    const safeExtras = Object.fromEntries(
+      Object.entries(metadata || {})
+        .filter(([, v]) => v !== undefined && v !== null)
+        .map(([k, v]) => [k, String(v)])
+    );
+
+    const mergedMetadata = {
+      ...safeExtras,
+      type: 'subscription',
+      barbershop_id: String(barbershopId),
+    };
+
     const params = {
       mode: 'subscription',
       locale: 'pt-BR',
@@ -34,15 +49,9 @@ export class StripeService {
       }],
       success_url: successUrl,
       cancel_url: cancelUrl,
-      metadata: { 
-        type: 'subscription',
-        barbershop_id: String(barbershopId) 
-      },
-      subscription_data: { 
-        metadata: { 
-          type: 'subscription',
-          barbershop_id: String(barbershopId) 
-        } 
+      metadata: mergedMetadata,
+      subscription_data: {
+        metadata: mergedMetadata,
       },
     };
     if (customerId) params.customer = customerId;
@@ -140,6 +149,21 @@ export class StripeService {
     }
     if (!event) throw lastErr || new Error('Webhook signature verification failed');
     return event;
+  }
+
+  static async retrieveSubscription(subscriptionId) {
+    if (!stripe) throw new Error('Stripe não configurado');
+    return stripe.subscriptions.retrieve(subscriptionId);
+  }
+
+  static async listSubscriptions({ status = 'all', limit = 100, startingAfter } = {}) {
+    if (!stripe) throw new Error('Stripe não configurado');
+    const params = {
+      status,
+      limit,
+      ...(startingAfter ? { starting_after: startingAfter } : {}),
+    };
+    return stripe.subscriptions.list(params);
   }
 }
 

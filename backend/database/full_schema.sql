@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS queue (
   updated_at TIMESTAMP NULL,
   position INT NOT NULL,
   alert_sent BOOLEAN DEFAULT FALSE,
+  position3_notified BOOLEAN DEFAULT FALSE,
   skip_count INT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   created_by_ip VARCHAR(50) NULL,

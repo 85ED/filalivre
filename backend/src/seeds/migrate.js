@@ -421,6 +421,97 @@ export async function runMigrations() {
       ],
     });
 
+    // Migration 015: Stripe billing status fields (status_assinatura/ativo/invoice/tentativas)
+    migrations.push({
+      name: '015_stripe_billing_fields',
+      queries: [
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM barbershops LIKE 'status_assinatura'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE barbershops ADD COLUMN status_assinatura VARCHAR(40) NULL`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM barbershops LIKE 'ativo'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE barbershops ADD COLUMN ativo TINYINT(1) NOT NULL DEFAULT 1`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM barbershops LIKE 'data_ultimo_pagamento'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE barbershops ADD COLUMN data_ultimo_pagamento TIMESTAMP NULL`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM barbershops LIKE 'stripe_invoice_id'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE barbershops ADD COLUMN stripe_invoice_id VARCHAR(100) NULL`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM barbershops LIKE 'tentativas_pagamento'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE barbershops ADD COLUMN tentativas_pagamento INT NOT NULL DEFAULT 0`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM barbershops LIKE 'proxima_tentativa_pagamento'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE barbershops ADD COLUMN proxima_tentativa_pagamento TIMESTAMP NULL`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+        // Backfill: if subscription_status exists, initialize status_assinatura when empty
+        async (conn) => {
+          try {
+            await conn.query(`
+              UPDATE barbershops
+              SET status_assinatura = CASE
+                WHEN subscription_status = 'active' THEN 'ativa'
+                WHEN subscription_status = 'cancelled' THEN 'cancelada'
+                WHEN subscription_status = 'expired' THEN 'pendente_bloqueado'
+                ELSE status_assinatura
+              END
+              WHERE (status_assinatura IS NULL OR status_assinatura = '')
+                AND subscription_status IS NOT NULL
+            `);
+          } catch (e) { /* ignore */ }
+        },
+      ],
+    });
+
+    // Migration 016: queue position 3 notification flag
+    migrations.push({
+      name: '016_queue_position3_notified',
+      queries: [
+        async (conn) => {
+          try {
+            const [cols] = await conn.query(`SHOW COLUMNS FROM queue LIKE 'position3_notified'`);
+            if (cols.length === 0) {
+              await conn.query(`ALTER TABLE queue ADD COLUMN position3_notified TINYINT(1) DEFAULT 0`);
+            }
+          } catch (e) { /* ignore */ }
+        },
+        async (conn) => {
+          try {
+            await conn.query(`CREATE INDEX idx_queue_position3_notify ON queue(barbershop_id, status, position3_notified, position, id)`);
+          } catch (e) { /* ignore if index already exists */ }
+        },
+      ],
+    });
+
     for (const migration of migrations) {
       const [applied] = await pool.query('SELECT * FROM _migrations WHERE name = ?', [migration.name]);
       if (applied.length > 0) continue;

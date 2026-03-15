@@ -29,7 +29,21 @@ export class Barbershop {
   }
 
   static async update(id, data) {
-    const { name, slug, owner_name, email, phone, subscription_status, trial_expires_at } = data;
+    const {
+      name,
+      slug,
+      owner_name,
+      email,
+      phone,
+      subscription_status,
+      trial_expires_at,
+      status_assinatura,
+      ativo,
+      data_ultimo_pagamento,
+      stripe_invoice_id,
+      tentativas_pagamento,
+      proxima_tentativa_pagamento,
+    } = data;
     const fields = [];
     const values = [];
 
@@ -60,6 +74,30 @@ export class Barbershop {
     if (trial_expires_at !== undefined) {
       fields.push('trial_expires_at = ?');
       values.push(trial_expires_at);
+    }
+    if (status_assinatura !== undefined) {
+      fields.push('status_assinatura = ?');
+      values.push(status_assinatura);
+    }
+    if (ativo !== undefined) {
+      fields.push('ativo = ?');
+      values.push(ativo);
+    }
+    if (data_ultimo_pagamento !== undefined) {
+      fields.push('data_ultimo_pagamento = ?');
+      values.push(data_ultimo_pagamento);
+    }
+    if (stripe_invoice_id !== undefined) {
+      fields.push('stripe_invoice_id = ?');
+      values.push(stripe_invoice_id);
+    }
+    if (tentativas_pagamento !== undefined) {
+      fields.push('tentativas_pagamento = ?');
+      values.push(tentativas_pagamento);
+    }
+    if (proxima_tentativa_pagamento !== undefined) {
+      fields.push('proxima_tentativa_pagamento = ?');
+      values.push(proxima_tentativa_pagamento);
     }
     if (data.stripe_customer_id !== undefined) {
       fields.push('stripe_customer_id = ?');

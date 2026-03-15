@@ -44,6 +44,10 @@ export class SubscriptionController {
         seatPriceCents,
         seatQuantity,
         barbershopId,
+        metadata: {
+          user_id: req.user?.id,
+          empresa_id: barbershopId,
+        },
         successUrl: `${baseUrl}/assinatura?session_id={CHECKOUT_SESSION_ID}`,
         cancelUrl: `${baseUrl}/assinatura`,
       });

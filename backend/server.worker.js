@@ -1,8 +1,9 @@
 import './env.js';
 import pool from './src/config/database.js';
+import { startStripeReconciliationScheduler } from './src/workers/StripeReconciliationJob.js';
 
 const WHATSAPP_SERVICE_URL = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3003';
-const CHECK_INTERVAL = parseInt(process.env.WORKER_INTERVAL || '5000', 10);
+const CHECK_INTERVAL = parseInt(process.env.WORKER_INTERVAL || '10000', 10);
 const DEBUG = process.env.WORKER_DEBUG === '1';
 
 console.log(`
@@ -47,12 +48,27 @@ async function checkWhatsAppStatus(barbershopId) {
 async function checkQueueAlerts() {
   try {
     const [candidates] = await pool.query(
-      `SELECT id, name, phone, status, alert_sent, position, barbershop_id
-       FROM queue
-       WHERE status = 'waiting'
-       AND (alert_sent = false OR alert_sent IS NULL)
-       AND phone IS NOT NULL
-       AND TRIM(phone) != ''`
+      `SELECT
+          q.id,
+          q.name,
+          q.phone,
+          q.status,
+          q.barbershop_id,
+          1 + (
+            SELECT COUNT(*)
+            FROM queue q2
+            WHERE q2.barbershop_id = q.barbershop_id
+              AND q2.status = 'waiting'
+              AND (
+                q2.position < q.position
+                OR (q2.position = q.position AND q2.id < q.id)
+              )
+          ) AS current_position
+       FROM queue q
+       WHERE q.status = 'waiting'
+         AND COALESCE(q.position3_notified, 0) = 0
+         AND q.phone IS NOT NULL
+         AND TRIM(q.phone) != ''`
     );
 
     if (DEBUG) {
@@ -62,35 +78,16 @@ async function checkQueueAlerts() {
     let sentCount = 0;
     let skippedPosition = 0;
     let skippedInactive = 0;
-    let skippedBadPosition = 0;
     let errorCount = 0;
 
     for (const client of candidates) {
-      if (!client.position || Number(client.position) <= 0) {
-        skippedBadPosition++;
-        if (DEBUG) {
-          console.log(
-            `[Worker] Skip: invalid position for ${client.name} (id=${client.id}, position=${client.position})`
-          );
-        }
-        continue;
-      }
-
       // Regra: enviar apenas para o cliente na posição 3
-      if (Number(client.position) !== 3) {
+      if (Number(client.current_position) !== 3) {
         skippedPosition++;
         continue;
       }
 
-      const [ahead] = await pool.query(
-        `SELECT COUNT(*) as cnt FROM queue
-         WHERE barbershop_id = ?
-         AND status = 'waiting'
-         AND position < ?`,
-        [client.barbershop_id, client.position]
-      );
-
-      const peopleAhead = ahead[0].cnt;
+      const peopleAhead = Number(client.current_position) - 1;
 
       // Check if WhatsApp session is active via HTTP
       const sessionActive = await checkWhatsAppStatus(client.barbershop_id);
@@ -105,13 +102,24 @@ async function checkQueueAlerts() {
       }
 
       // Claim atômico para evitar múltiplos envios em paralelo (ex.: 2 workers/2 pods)
-      // Só 1 worker conseguirá marcar alert_sent=true para este id.
+      // Só 1 worker conseguirá marcar position3_notified=true para este id,
+      // e apenas se ele ainda estiver na posição 3 no momento do claim.
       const [claim] = await pool.query(
         `UPDATE queue
-         SET alert_sent = true
+         SET position3_notified = true
          WHERE id = ?
            AND status = 'waiting'
-           AND (alert_sent = false OR alert_sent IS NULL)`,
+           AND COALESCE(position3_notified, 0) = 0
+           AND 1 + (
+             SELECT COUNT(*)
+             FROM queue q2
+             WHERE q2.barbershop_id = queue.barbershop_id
+               AND q2.status = 'waiting'
+               AND (
+                 q2.position < queue.position
+                 OR (q2.position = queue.position AND q2.id < queue.id)
+               )
+           ) = 3`,
         [client.id]
       );
 
@@ -141,7 +149,7 @@ async function checkQueueAlerts() {
     }
 
     console.log(
-      `[Worker] Summary: candidates=${candidates.length} sent=${sentCount} skippedPosition=${skippedPosition} skippedInactive=${skippedInactive} skippedBadPosition=${skippedBadPosition} errors=${errorCount}`
+      `[Worker] Summary: candidates=${candidates.length} sent=${sentCount} skippedPosition=${skippedPosition} skippedInactive=${skippedInactive} errors=${errorCount}`
     );
   } catch (err) {
     console.error('[Worker] Erro ao verificar alertas:', err.message);
@@ -153,8 +161,16 @@ async function startWorker() {
 
   let running = false;
 
+  const scheduleNext = () => {
+    setTimeout(tick, CHECK_INTERVAL);
+  };
+
   const tick = async () => {
-    if (running) return;
+    if (running) {
+      scheduleNext();
+      return;
+    }
+
     running = true;
     const startedAt = Date.now();
     try {
@@ -166,12 +182,12 @@ async function startWorker() {
       console.error('[Worker] Worker error:', err?.message || err);
     } finally {
       running = false;
+      scheduleNext();
     }
   };
 
-  // Executa imediatamente e depois entra no loop
+  // Executa imediatamente; próximos ciclos via setTimeout
   await tick();
-  setInterval(tick, CHECK_INTERVAL);
 }
 
 process.on('unhandledRejection', (reason) => {
@@ -193,3 +209,6 @@ process.on('SIGTERM', async () => {
 });
 
 startWorker();
+
+// Stripe reconciliation (1x ao dia) — segurança contra inconsistências
+startStripeReconciliationScheduler();

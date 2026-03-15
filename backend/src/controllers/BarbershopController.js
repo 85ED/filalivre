@@ -24,7 +24,7 @@ export class BarbershopController {
       }
       const trialExpired = barbershop.trial_expires_at && new Date(barbershop.trial_expires_at) <= new Date();
       const isActive = barbershop.subscription_status === 'active';
-      const blocked = !isActive && trialExpired;
+      const blocked = (barbershop.ativo === 0) || (!isActive && trialExpired);
       const activeCount = await Barber.countActiveByBarbershop(barbershopId);
       const seatPriceCents = barbershop.seat_price_cents || 3500;
 

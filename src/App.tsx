@@ -20,7 +20,7 @@ function AppContent() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/esqueci-senha" element={<ForgotPasswordPage />} />
       <Route path="/resetar-senha" element={<ResetPasswordPage />} />
-      <Route path="/barbeiro" element={<AuthGuard allowedRoles={['barber']}><TrialGuard><BarberPage /></TrialGuard></AuthGuard>} />
+      <Route path="/profissional" element={<AuthGuard allowedRoles={['barber']}><TrialGuard><BarberPage /></TrialGuard></AuthGuard>} />
       <Route path="/admin" element={<AuthGuard allowedRoles={['admin', 'owner']}><TrialGuard><AdminPage /></TrialGuard></AuthGuard>} />
       <Route path="/assinatura" element={<AuthGuard allowedRoles={['admin', 'owner']}><SubscriptionPage /></AuthGuard>} />
       <Route path="/platform-admin" element={<AuthGuard allowedRoles={['platform_owner']}><PlatformAdminPage /></AuthGuard>} />

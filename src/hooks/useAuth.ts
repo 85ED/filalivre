@@ -98,7 +98,7 @@ export function useAuth() {
       case 'platform_owner': return '/platform-admin';
       case 'admin':
       case 'owner': return '/admin';
-      case 'barber': return '/barbeiro';
+      case 'barber': return '/profissional';
       default: return '/';
     }
   }, []);

@@ -42,6 +42,7 @@ CREATE TABLE queue (
   status ENUM('waiting', 'called', 'serving', 'finished', 'cancelled', 'no_show', 'removed') DEFAULT 'waiting',
   position INT NOT NULL,
   alert_sent BOOLEAN DEFAULT FALSE,
+  position3_notified BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (barbershop_id) REFERENCES barbershops(id) ON DELETE CASCADE,
   FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE SET NULL

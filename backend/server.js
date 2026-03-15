@@ -54,6 +54,10 @@ app.post('/api/subscription/checkout', authMiddleware, roleMiddleware(['admin', 
 app.post('/api/subscription/portal', authMiddleware, roleMiddleware(['admin', 'owner']), SubscriptionController.getPortalSession);
 app.get('/api/subscription/seat-info', authMiddleware, roleMiddleware(['admin', 'owner']), SubscriptionController.getSeatInfo);
 
+// Stripe (aliases) — endpoints solicitados no prompt
+app.post('/api/stripe/create-checkout-session', authMiddleware, roleMiddleware(['admin', 'owner']), SubscriptionController.createCheckout);
+app.post('/api/stripe/customer-portal', authMiddleware, roleMiddleware(['admin', 'owner']), SubscriptionController.getPortalSession);
+
 // WhatsApp — proxy requests to filalivre-whatsapp microservice
 const WHATSAPP_SERVICE_URL =
   process.env.WHATSAPP_SERVICE_URL || 'http://filalivre-whatsapp:3003';
