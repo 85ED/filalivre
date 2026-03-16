@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { useEffect } from 'react';
 import { LandingPage } from './pages/landing';
 import { LoginPage } from './pages/login';
 import { ClientQueuePage } from './pages/client-queue';
@@ -32,14 +31,6 @@ function AppContent() {
 }
 
 function App() {
-  useEffect(() => {
-    // Google Site Verification
-    const meta = document.createElement('meta');
-    meta.name = 'google-site-verification';
-    meta.content = 'IH3fbEzy2e8DVDawF4Oh4JuQnwjCvpuxxIvCn1mKdVM';
-    document.head.appendChild(meta);
-  }, []);
-
   return (
     <BrowserRouter>
       <AppContent />

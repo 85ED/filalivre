@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /profissional
+Disallow: /platform-admin
+Disallow: /assinatura
+
+Sitemap: https://filalivre.app.br/sitemap.xml
