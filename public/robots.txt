@@ -1,8 +1,10 @@
 User-agent: *
-Allow: /
 Disallow: /admin
 Disallow: /profissional
 Disallow: /platform-admin
 Disallow: /assinatura
+Disallow: /login
+Disallow: /esqueci-senha
+Disallow: /resetar-senha
 
 Sitemap: https://filalivre.app.br/sitemap.xml
