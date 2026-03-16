@@ -41,19 +41,25 @@ export async function checkQueueAlerts() {
         const [claim] = await pool.query(
           `UPDATE queue
            SET position3_notified = 1
-           WHERE id = ?
-             AND status = 'waiting'
-             AND COALESCE(position3_notified, 0) = 0
-             AND 1 + (
-               SELECT COUNT(*)
-               FROM queue q2
-               WHERE q2.barbershop_id = queue.barbershop_id
-                 AND q2.status = 'waiting'
-                 AND (
-                   q2.position < queue.position
-                   OR (q2.position = queue.position AND q2.id < queue.id)
-                 )
-             ) = 3`,
+           WHERE id IN (
+             SELECT id FROM (
+               SELECT q.id
+               FROM queue q
+               WHERE q.id = ?
+                 AND q.status = 'waiting'
+                 AND COALESCE(q.position3_notified, 0) = 0
+                 AND 1 + (
+                   SELECT COUNT(*)
+                   FROM queue q2
+                   WHERE q2.barbershop_id = q.barbershop_id
+                     AND q2.status = 'waiting'
+                     AND (
+                       q2.position < q.position
+                       OR (q2.position = q.position AND q2.id < q.id)
+                     )
+                 ) = 3
+             ) AS eligible
+           )`,
           [client.id]
         );
 
