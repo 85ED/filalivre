@@ -28,8 +28,14 @@ async function sendWhatsAppMessage(barbershopId, phone, message) {
     body: JSON.stringify({ barbershopId, phone, message }),
   });
   if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.error || `HTTP ${response.status}`);
+    const contentType = response.headers.get('content-type') || '';
+    const data = contentType.includes('application/json')
+      ? await response.json().catch(() => ({}))
+      : { error: await response.text().catch(() => '') };
+    const status = response.status;
+    const code = data?.code ? ` code=${data.code}` : '';
+    const details = data?.details ? ` details=${data.details}` : '';
+    throw new Error(`${data?.error || 'Erro ao enviar'} (http=${status}${code}${details})`);
   }
   return response.json();
 }
@@ -102,11 +108,13 @@ async function checkQueueAlerts() {
       }
 
       // Claim atômico para evitar múltiplos envios em paralelo (ex.: 2 workers/2 pods)
-      // Só 1 worker conseguirá marcar position3_notified=true para este id,
-      // e apenas se ele ainda estiver na posição 3 no momento do claim.
+      // Estados em position3_notified:
+      // 0 = não notificado
+      // 2 = em envio (inflight)
+      // 1 = notificado
       const [claim] = await pool.query(
         `UPDATE queue
-         SET position3_notified = 1
+         SET position3_notified = 2
          WHERE id IN (
            SELECT id FROM (
              SELECT q.id
@@ -143,6 +151,16 @@ async function checkQueueAlerts() {
 
         await sendWhatsAppMessage(client.barbershop_id, client.phone, message);
 
+        // Finaliza: só marca como notificado se ainda estiver em envio (2)
+        await pool.query(
+          `UPDATE queue
+           SET position3_notified = 1
+           WHERE id = ?
+             AND status = 'waiting'
+             AND COALESCE(position3_notified, 0) = 2`,
+          [client.id]
+        );
+
         sentCount++;
         console.log(
           `[Worker] WhatsApp enviado para ${client.name} (${maskPhone(client.phone)}) - ${peopleAhead} à frente`
@@ -150,7 +168,19 @@ async function checkQueueAlerts() {
       } catch (err) {
         errorCount++;
         console.error(`[Worker] Erro ao enviar WhatsApp para ${client.name}:`, err);
-        // Regra: não retentar no próximo ciclo. O alerta é informativo e já foi "claimado".
+
+        // Reverte claim para permitir retentativa no próximo ciclo
+        try {
+          await pool.query(
+            `UPDATE queue
+             SET position3_notified = 0
+             WHERE id = ?
+               AND COALESCE(position3_notified, 0) = 2`,
+            [client.id]
+          );
+        } catch (rollbackErr) {
+          console.error('[Worker] Falha ao reverter claim:', rollbackErr?.message || rollbackErr);
+        }
       }
     }
 

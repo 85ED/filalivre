@@ -84,6 +84,15 @@ app.post('/send', async (req, res) => {
       return res.status(400).json({ error: 'Sessão WhatsApp não inicializada' });
     }
 
+    // Sessão pode existir mas ainda não estar pronta (ou ter caído): não tenta enviar
+    const ready = await isSessionReady(sessionName).catch(() => false);
+    if (!ready) {
+      return res.status(409).json({
+        error: 'Sessão WhatsApp não está pronta para envio',
+        code: 'WHATSAPP_SESSION_NOT_READY',
+      });
+    }
+
     const jid = formatPhone(phone);
     if (!jid) {
       return res.status(400).json({ error: 'Telefone inválido para WhatsApp' });
